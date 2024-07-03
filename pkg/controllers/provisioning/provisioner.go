@@ -337,7 +337,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 
 	// Logs the pending pods
 	// This feels like a lot of info, how do I cut it down?
-	log.FromContext(ctx).Info("Pending pods", "pods", lo.ToSlicePtr(pods))
+	// log.FromContext(ctx).Info("Pending pods", "pods", lo.ToSlicePtr(pods))
 	//pods[0].Marshal() I think this saves as protobuf intrinsically, using k8s api generated.pb.go
 	// k8s.io/api/core/v1/generated.proto
 
@@ -359,11 +359,8 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 	//log.Info("daemonSetPods input to scheduler.NewScheduler", "daemonSetPods", daemonSetPods)
 	// log.Info("recorder input to scheduler.NewScheduler", "recorder", p.recorder)
 
-	// if err := orbbatcher.saveToS3Bucket(logname, logline); err != nil {
-	// 	fmt.Println("Error saving to bucket:", err)
-	// }
-	// p.queue.Set.Insert("Testing from the Provisioner")
-	// fmt.Println("I'm printing the queue from Provisioner...", p.queue)
+	p.queue.Set.Insert("Testing from the Provisioner")
+	p.queue.Set.Insert("First pod name:", pods[0].Name) // a test value, eventually this will be a protobuf version of all things we want.
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
 }

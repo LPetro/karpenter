@@ -19,11 +19,6 @@ package orbbatcher
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
@@ -34,7 +29,7 @@ import (
 )
 
 // Set global variable(s) for Mounted PV path
-var mountPath = "/data"
+// var mountPath = "/data"
 
 // const (
 // 	orbQueueBaseDelay = 100 * time.Millisecond
@@ -91,13 +86,21 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	// c.queue.Set.Insert("Hello World from the ORB Batcher Reconciler")
 
-	// // for items in the Queue, print them
-	// for item := range c.queue.Set {
-	// 	fmt.Println(item)
-	// }
+	// for items in the Queue, print them
+	for item := range c.queue.Set {
+		fmt.Println(item)
+		c.queue.Set.Delete(item) // remove from the queue
+	}
 
 	// fmt.Println("Ending One Reconcile Print from ORB...")
 	// fmt.Println()
+
+	// // Save to the Persistent Volume
+	// err := c.saveToPV("helloworld.txt", "sample_logline")
+	// if err != nil {
+	// 	fmt.Println("Error saving to PV:", err)
+	// 	return reconcile.Result{}, err
+	// }
 
 	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 }
@@ -110,84 +113,45 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 		Complete(singleton.AsReconciler(c))
 }
 
-// Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
-// They highly recommend sanitizing inputs before accessing that path.
-func sanitizePath(path string) string {
-	// Remove any leading or trailing slashes, "../" or "./"...
-	path = strings.TrimPrefix(path, "/")
-	path = strings.TrimSuffix(path, "/")
-	path = regexp.MustCompile(`\.\.\/`).ReplaceAllString(path, "")
-	path = regexp.MustCompile(`\.\/`).ReplaceAllString(path, "")
-	path = strings.ReplaceAll(path, "../", "")
+// // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
+// // They highly recommend sanitizing inputs before accessing that path.
+// func (c *Controller) sanitizePath(path string) string {
+// 	// Remove any leading or trailing slashes, "../" or "./"...
+// 	path = strings.TrimPrefix(path, "/")
+// 	path = strings.TrimSuffix(path, "/")
+// 	path = regexp.MustCompile(`\.\.\/`).ReplaceAllString(path, "")
+// 	path = regexp.MustCompile(`\.\/`).ReplaceAllString(path, "")
+// 	path = strings.ReplaceAll(path, "../", "")
 
-	return path
-}
+// 	return path
+// }
 
-/* This function saves things to our Persistent Volume */
-// Saves data to PV (S3 Bucket for AWS) via the mounted log path
-// It takes a name of the log file as well as the logline to be logged.
-// The function opens a file for writing, writes some data to the file, and then closes the file
-func saveToS3Bucket(logname string, logline string) error {
-	// Create the log file path and desired logline (example for now)
-	sanitizedname := sanitizePath(logname)
-	path := filepath.Join(mountPath, sanitizedname)
-	//logline := fmt.Sprintf("Printing data (from %s) to the S3 bucket", logname)
+// /* This function saves things to our Persistent Volume */
+// // Saves data to PV (S3 Bucket for AWS) via the mounted log path
+// // It takes a name of the log file as well as the logline to be logged.
+// // The function opens a file for writing, writes some data to the file, and then closes the file
+// // func (c *Controller) saveToPV(logname string, logline string) error {
 
-	// Opens the mounted volume (S3 Bucket) file at that path
-	file, err := os.Create(path)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
+// // 	// Create the log file path and desired logline (example for now)
+// // 	sanitizedname := c.sanitizePath(logname)
+// // 	path := filepath.Join(mountPath, sanitizedname)
+// // 	//logline := fmt.Sprintf("Printing data (from %s) to the S3 bucket", logname)
 
-	// Writes data to the file
-	_, err = fmt.Fprintln(file, logline)
-	if err != nil {
-		fmt.Println("Error writing to file:", err)
-		return err
-	}
+// // 	// Opens the mounted volume (S3 Bucket) file at that path
+// // 	file, err := os.Create(path)
+// // 	if err != nil {
+// // 		fmt.Println("Error opening file:", err)
+// // 		return err
+// // 	}
+// // 	defer file.Close()
 
-	fmt.Println("Data written to S3 bucket successfully!")
-	return nil
-}
+// // 	// Writes data to the file
+// // 	_, err = fmt.Fprintln(file, logline)
+// // 	if err != nil {
+// // 		fmt.Println("Error writing to file:", err)
+// // 		return err
+// // 	}
 
-/* This function pulls things from our Persistent Volume */
-// Function to read (and print out?) the logged data from file
-func readFromS3Bucket(logname string) error {
-	// Create the log file path
-	sanitizedname := sanitizePath(logname)
-	path := filepath.Join(mountPath, sanitizedname)
-
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
-
-	// Read the entire file into a byte slice
-	data, err := io.ReadAll(file)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return err
-	}
-
-	// Print the contents of the file
-	fmt.Println("File Contents:")
-	fmt.Println(string(data)) // converts data byteslice to string and prints
-
-	// (If I want to read line by line, use this instead) // Read the file line by line
-	// scanner := bufio.NewScanner(file)
-	// counter := 0
-	// for scanner.Scan() {
-	// 	line := scanner.Text()
-	// 	fmt.Printf("Line #%d: %s\n", counter, line)
-	// }
-
-	// // Check for any errors that occurred during scanning
-	// if err := scanner.Err(); err != nil {
-	// 	fmt.Println("Error reading file:", err)
-	// }
-	return nil
-}
+// // 	fmt.Println("Data written to S3 bucket successfully!")
+// // 	return nil
+// // }
