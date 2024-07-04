@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -111,6 +112,12 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 		Named("orb.batcher").
 		WatchesRawSource(singleton.Source()).
 		Complete(singleton.AsReconciler(c))
+}
+
+// This function as a human readable test function for serializing desired pod data
+// It takes in a v1.Pod and gets the string representations of all the fields we care about.
+func PodToString(pod *v1.Pod) string {
+	return fmt.Sprintf("Name: %s, Namespace: %s, Phase: %s, NodeName: %s", pod.Name, pod.Namespace, pod.Status.Phase, pod.Spec.NodeName)
 }
 
 // // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal

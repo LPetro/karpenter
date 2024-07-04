@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -359,8 +361,31 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 	//log.Info("daemonSetPods input to scheduler.NewScheduler", "daemonSetPods", daemonSetPods)
 	// log.Info("recorder input to scheduler.NewScheduler", "recorder", p.recorder)
 
+	logpath := "/data"           // Log directory
+	logname := "hello_world.txt" // Log file name
+
+	// Opens a file in the logpath (ideally a mounted volume)
+	file, err := os.OpenFile(filepath.Join(logpath, logname), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+	defer file.Close()
+
+	// Writes data to the file
+	_, err = fmt.Fprintln(file, "Printing data to the S3 bucket", logname)
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+		return nil, err
+	}
+
+	fmt.Println("Data written to S3 bucket successfully!")
+
 	p.queue.Set.Insert("Testing from the Provisioner")
-	p.queue.Set.Insert("First pod name:", pods[0].Name) // a test value, eventually this will be a protobuf version of all things we want.
+	// for _, pod := range pods {
+	// 	p.queue.Set.Insert(orbbatcher.PodToString(pod))
+	// }
+	// p.queue.Set.Insert("First pod name:", pods[0].Name) // a test value, eventually this will be a protobuf version of all things we want.
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
 }
