@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -85,12 +83,12 @@ type Provisioner struct {
 	volumeTopology *scheduler.VolumeTopology
 	cluster        *state.Cluster
 	recorder       events.Recorder
-	queue          *orbbatcher.Queue
+	queue          *orbbatcher.TestQueue
 	cm             *pretty.ChangeMonitor
 }
 
 func NewProvisioner(kubeClient client.Client, recorder events.Recorder,
-	cloudProvider cloudprovider.CloudProvider, cluster *state.Cluster, queue *orbbatcher.Queue,
+	cloudProvider cloudprovider.CloudProvider, cluster *state.Cluster, queue *orbbatcher.TestQueue,
 ) *Provisioner {
 	p := &Provisioner{
 		batcher:        NewBatcher(),
@@ -315,77 +313,8 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 		return nil, fmt.Errorf("getting daemon pods, %w", err)
 	}
 
-	// // Print the scheduling simulation inputs
-	// fmt.Printf("Inputs to scheduler.NewScheduler:\n")
-	// fmt.Printf("  ctx: %v\n", ctx)
-	// fmt.Printf("  kubeClient: %v\n", p.kubeClient)
-	// fmt.Printf("  nodePools: %v\n", lo.ToSlicePtr(nodePoolList.Items))
-	// fmt.Printf("  cluster: %v\n", p.cluster)
-	// fmt.Printf("  stateNodes: %v\n", stateNodes)
-	// fmt.Printf("  topology: %v\n", topology)
-	// fmt.Printf("  instanceTypes: %v\n", instanceTypes)
-	// fmt.Printf("  daemonSetPods: %v\n", daemonSetPods)
-	// //fmt.Printf("  recorder: %v\n", p.recorder)
-	//log.FromContext(ctx).Info("Context input to scheduler.NewScheduler", "ctx", ctx)
-	//log.FromContext(ctx).Info("kubeClient input to scheduler.NewScheduler", "kubeClient", p.kubeClient)
-	//log.FromContext(ctx).Info("nodePools input to scheduler.NewScheduler", "nodePools", lo.ToSlicePtr(nodePoolList.Items))
-
-	// Deserialize and JSON marshal cluster
-	// clusterJSON, err := json.Marshal(p.cluster)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("marshaling cluster, %w", err)
-	// }
-	// fmt.Println(string(clusterJSON))
-
-	// Logs the pending pods
-	// This feels like a lot of info, how do I cut it down?
-	// log.FromContext(ctx).Info("Pending pods", "pods", lo.ToSlicePtr(pods))
-	//pods[0].Marshal() I think this saves as protobuf intrinsically, using k8s api generated.pb.go
-	// k8s.io/api/core/v1/generated.proto
-
-	// Also only do this is pending pods has changed.
-
-	// Log the state nodes
-	// log.FromContext(ctx).Info("State nodes", "stateNodes", lo.ToSlicePtr(stateNodes))
-
-	// Log the topology
-	// log.FromContext(ctx).Info("Topology", "topology", topology)
-
-	// Log the instance types
-	// log.FromContext(ctx).Info("Instance types", "instanceTypes", instanceTypes)
-
-	// log.Info("cluster input to scheduler.NewScheduler", "cluster", p.cluster)
-	// log.Info("stateNodes input to scheduler.NewScheduler", "stateNodes", stateNodes[0])
-	//log.Info("topology input to scheduler.NewScheduler", "topology", topology)
-	// log.Info("instanceTypes input to scheduler.NewScheduler", "instanceTypes", instanceTypes["default"][0])
-	//log.Info("daemonSetPods input to scheduler.NewScheduler", "daemonSetPods", daemonSetPods)
-	// log.Info("recorder input to scheduler.NewScheduler", "recorder", p.recorder)
-
-	logpath := "/data"           // Log directory
-	logname := "hello_world.txt" // Log file name
-
-	// Opens a file in the logpath (ideally a mounted volume)
-	file, err := os.OpenFile(filepath.Join(logpath, logname), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil, err
-	}
-	defer file.Close()
-
-	// Writes data to the file
-	_, err = fmt.Fprintln(file, "Printing data to the S3 bucket", logname)
-	if err != nil {
-		fmt.Println("Error writing to file:", err)
-		return nil, err
-	}
-
-	fmt.Println("Data written to S3 bucket successfully!")
-
-	p.queue.Set.Insert("Testing from the Provisioner")
-	// for _, pod := range pods {
-	// 	p.queue.Set.Insert(orbbatcher.PodToString(pod))
-	// }
-	// p.queue.Set.Insert("First pod name:", pods[0].Name) // a test value, eventually this will be a protobuf version of all things we want.
+	// Runs a few test logs that ORB should run. It queues as strings not pbs yet, and not to PV yet.
+	p.queue.TestLogProvisioningScheduler(pods, stateNodes, instanceTypes)
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
 }
