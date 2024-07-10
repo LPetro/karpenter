@@ -240,14 +240,14 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		fmt.Println(SchedulingInputToString(item))
 		data, err := SchedulingInputToPB(item)
 		if err != nil {
-			fmt.Println("Error converting to PB:", err)
+			fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 			return reconcile.Result{}, err
 		}
 
 		// Timestamp the file
 		now := time.Now()
 		timestampStr := now.Format("2006-01-02_15-04-05")
-		fileName := fmt.Sprintf("pendingpods_%s.log", timestampStr)
+		fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
 
 		// Save to the Persistent Volume (maybe save as log_timestamp for uniqueness, or monotonically increasing counter)
 		err = c.SaveToPV(fileName, data)
@@ -263,17 +263,14 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			return reconcile.Result{}, err
 		}
 
-		fmt.Println("data sent is: ", data)
-		fmt.Println("data read is: ", readdata)
-
-		// PB to si
+		// Protobuff to si
 		si, err := PBToSchedulingInput(readdata)
 		if err != nil {
 			fmt.Println("Error converting PB to SI:", err)
 			return reconcile.Result{}, err
 		}
 		// Print si
-		fmt.Println(SchedulingInputToString(si))
+		fmt.Println("Reconstructed Scheduling Input looks like: " + SchedulingInputToString(si))
 	}
 
 	// // For each scheduling input in my queue (c.queue), print to string and send to PV
