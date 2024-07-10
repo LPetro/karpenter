@@ -168,6 +168,9 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	fmt.Println("Starting One Reconcile Print from ORB...")
 
+	// set a blank []byte
+	sample_logline := []byte{}
+
 	//c.queue.TestEnqueue("Hello World from the ORB Batcher Reconciler")
 
 	// While a queue is not empty (has items to dequeue), dequeue and print
@@ -181,6 +184,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// Test prints, to show they are dequeuing. These otherwise get sent to the PV
 		//fmt.Println(item)
 		PrintPodPB(item)
+		sample_logline = item
 	}
 
 	fmt.Println("Ending One Reconcile Print from ORB...")
@@ -193,12 +197,12 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	// TODO: How should I save a [][]byte (i.e. the pb queue) to a file (or multiple files?)
 
-	// // Save to the Persistent Volume
-	// err := c.SaveToPV("helloworld.txt", "sample_logline")
-	// if err != nil {
-	// 	fmt.Println("Error saving to PV:", err)
-	// 	return reconcile.Result{}, err
-	// }
+	// Save to the Persistent Volume
+	err := c.SaveToPV("helloworld.txt", "sample_logline: "+string(sample_logline))
+	if err != nil {
+		fmt.Println("Error saving to PV:", err)
+		return reconcile.Result{}, err
+	}
 
 	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 }
@@ -415,12 +419,11 @@ func (c *Controller) sanitizePath(path string) string {
 func (c *Controller) SaveToPV(logname string, logline string) error {
 
 	// Set global variable(s) for Mounted PV path
-	//var mountPath = "/data"
-	var testPath = "/"
+	var mountPath = "/data"
 
 	// Create the log file path and desired logline (example for now)
 	sanitizedname := c.sanitizePath(logname)
-	path := filepath.Join(testPath, sanitizedname)
+	path := filepath.Join(mountPath, sanitizedname)
 	//logline := fmt.Sprintf("Printing data (from %s) to the S3 bucket", logname)
 
 	// Opens the mounted volume (S3 Bucket) file at that path
