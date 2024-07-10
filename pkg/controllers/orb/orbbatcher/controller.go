@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -605,7 +606,8 @@ func (c *Controller) SaveToPV(logname string, logdata []byte) error {
 	defer file.Close()
 
 	// Writes data to the file
-	_, err = fmt.Fprintln(file, logdata)
+	//_, err = fmt.Fprintln(file, logdata)
+	_, err = file.Write(logdata)
 	if err != nil {
 		fmt.Println("Error writing to file:", err)
 		return err
@@ -630,12 +632,11 @@ func (c *Controller) ReadFromPV(logname string) ([]byte, error) {
 	defer file.Close()
 
 	// Read the contents of the file
-	var contents bytes.Buffer
-	_, err = contents.ReadFrom(file)
+	contents, err := io.ReadAll(file)
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 		return nil, err
 	}
 
-	return contents.Bytes(), nil
+	return contents, nil
 }
