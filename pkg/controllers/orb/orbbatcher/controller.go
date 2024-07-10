@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
+	"github.com/samber/lo"
+
 	//"google.golang.org/protobuf/proto"
 	proto "github.com/gogo/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
@@ -246,9 +248,21 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
 		}
-		//PrintPodPB(item)
-		// sample_logline = item
-		// fmt.Println(sample_logline)
+
+		// Read from the PV to check (will be what the ORB tool does from the Command Line)
+		readdata, err := c.ReadFromPV("pendingpods_" + string(len(data)) + ".log")
+		if err != nil {
+			fmt.Println("Error reading from PV:", err)
+			return reconcile.Result{}, err
+		}
+		// PB to si
+		si, err := PBToSchedulingInput(readdata)
+		if err != nil {
+			fmt.Println("Error converting PB to SI:", err)
+			return reconcile.Result{}, err
+		}
+		// Print si
+		fmt.Println(SchedulingInputToString(si))
 	}
 
 	// // For each scheduling input in my queue (c.queue), print to string and send to PV
@@ -434,6 +448,18 @@ func SchedulingInputToPB(si SchedulingInput) ([]byte, error) {
 	return podList.Marshal()
 }
 
+// Function to do the reverse, take a scheduling input's []byte and unmarshal it back into a SchedulingInput
+func PBToSchedulingInput(data []byte) (SchedulingInput, error) {
+	podList := &v1.PodList{}
+	if err := proto.Unmarshal(data, podList); err != nil {
+		return SchedulingInput{}, fmt.Errorf("unmarshaling pod list, %w", err)
+	}
+	pods := lo.ToSlicePtr(podList.Items)
+	return NewSchedulingInput(pods), nil
+}
+
+// Function for logging pending pods (as protobuf)
+
 // Function take a []byte, marshalled as a protobuf, and deserialize it into a SchedulingInput
 
 // Function for logging pending pods (as protobuf)
@@ -577,4 +603,29 @@ func (c *Controller) SaveToPV(logname string, logline string) error {
 
 	fmt.Println("Data written to S3 bucket successfully!")
 	return nil
+}
+
+// Function to pull from an S3 bucket
+func (c *Controller) ReadFromPV(logname string) ([]byte, error) {
+	var mountPath = "/data"
+	sanitizedname := c.sanitizePath(logname)
+	path := filepath.Join(mountPath, sanitizedname)
+
+	// Open the file for reading
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+	defer file.Close()
+
+	// Read the contents of the file
+	var contents bytes.Buffer
+	_, err = contents.ReadFrom(file)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return nil, err
+	}
+
+	return contents.Bytes(), nil
 }
