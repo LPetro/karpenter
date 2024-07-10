@@ -261,6 +261,10 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			fmt.Println("Error reading from PV:", err)
 			return reconcile.Result{}, err
 		}
+
+		fmt.Println("data sent is: ", data)
+		fmt.Println("data read is: ", readdata)
+
 		// PB to si
 		si, err := PBToSchedulingInput(readdata)
 		if err != nil {
