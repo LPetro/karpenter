@@ -242,15 +242,21 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			fmt.Println("Error converting to PB:", err)
 			return reconcile.Result{}, err
 		}
+
+		// Timestamp the file
+		now := time.Now()
+		timestampStr := now.Format("2006-01-02_15-04-05")
+		fileName := fmt.Sprintf("pendingpods_%s.log", timestampStr)
+
 		// Save to the Persistent Volume (maybe save as log_timestamp for uniqueness, or monotonically increasing counter)
-		err = c.SaveToPV("pendingpods_"+string(len(data))+".log", "sample_log: "+string(data))
+		err = c.SaveToPV(fileName, data)
 		if err != nil {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
 		}
 
 		// Read from the PV to check (will be what the ORB tool does from the Command Line)
-		readdata, err := c.ReadFromPV("pendingpods_" + string(len(data)) + ".log")
+		readdata, err := c.ReadFromPV(fileName)
 		if err != nil {
 			fmt.Println("Error reading from PV:", err)
 			return reconcile.Result{}, err
@@ -576,7 +582,7 @@ func (c *Controller) sanitizePath(path string) string {
 // Saves data to PV (S3 Bucket for AWS) via the mounted log path
 // It takes a name of the log file as well as the logline to be logged.
 // The function opens a file for writing, writes some data to the file, and then closes the file
-func (c *Controller) SaveToPV(logname string, logline string) error {
+func (c *Controller) SaveToPV(logname string, logdata []byte) error {
 
 	// Set global variable(s) for Mounted PV path
 	var mountPath = "/data"
@@ -595,7 +601,7 @@ func (c *Controller) SaveToPV(logname string, logline string) error {
 	defer file.Close()
 
 	// Writes data to the file
-	_, err = fmt.Fprintln(file, logline)
+	_, err = fmt.Fprintln(file, logdata)
 	if err != nil {
 		fmt.Println("Error writing to file:", err)
 		return err
