@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
+	//"google.golang.org/protobuf/proto"
+	proto "github.com/gogo/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	controllerruntime "sigs.k8s.io/controller-runtime"
@@ -39,15 +41,12 @@ import (
 	"sigs.k8s.io/karpenter/pkg/scheduling"
 )
 
-// Set global variable(s) for Mounted PV path
-var mountPath = "/data"
-
 // const (
 // 	orbQueueBaseDelay = 100 * time.Millisecond
 // 	orbQueueMaxDelay  = 10 * time.Second
 // )
 
-type PBQueue struct {
+type Queue struct {
 	//workqueue.RateLimitingInterface // TODO I saw this in another similar definition; what does it do, do I want/need it?
 	mu   sync.Mutex
 	data [][]byte
@@ -58,8 +57,8 @@ type TestQueue struct {
 	Set sets.Set[string]
 }
 
-func NewPBQueue() *PBQueue {
-	return &PBQueue{
+func NewQueue() *Queue {
+	return &Queue{
 		//RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(orbQueueBaseDelay, orbQueueMaxDelay)),
 		data: make([][]byte, 0),
 	}
@@ -70,19 +69,13 @@ func NewTestQueue() *TestQueue {
 		Set: sets.New[string](),
 	}
 }
-func (q *PBQueue) PBEnqueue(msg []byte) {
+func (q *Queue) Enqueue(msg []byte) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.data = append(q.data, msg)
 }
 
-func (q *TestQueue) TestEnqueue(str string) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.Set.Insert(str)
-}
-
-func (q *PBQueue) PBDequeue() ([]byte, bool) {
+func (q *Queue) Dequeue() ([]byte, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if len(q.data) == 0 {
@@ -91,6 +84,12 @@ func (q *PBQueue) PBDequeue() ([]byte, bool) {
 	msg := q.data[0]
 	q.data = q.data[1:]
 	return msg, true
+}
+
+func (q *TestQueue) TestEnqueue(str string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.Set.Insert(str)
 }
 
 func (q *TestQueue) TestDequeue() (string, bool) {
@@ -149,14 +148,15 @@ func (q *TestQueue) LogLine(item string) {
 // This functions deserialized _ resource into protobuf
 
 type Controller struct {
-	queue *TestQueue
-	// some sort of log store, or way to batch logs together before sending to PV
+	queue *Queue // Batches logs in a Queue
+	//testqueue *TestQueue
 }
 
 // TODO: add struct elements and their instantiations, when defined
-func NewController(queue *TestQueue) *Controller {
+func NewController(queue *Queue) *Controller {
 	return &Controller{
 		queue: queue,
+		//testqueue: queue,
 	}
 }
 
@@ -168,20 +168,30 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	fmt.Println("Starting One Reconcile Print from ORB...")
 
-	c.queue.TestEnqueue("Hello World from the ORB Batcher Reconciler")
+	//c.queue.TestEnqueue("Hello World from the ORB Batcher Reconciler")
 
 	// While a queue is not empty (has items to dequeue), dequeue and print
 	// TODO: There must be a prettier / more Go-like way to write this...
 	for {
-		item, nonempty := c.queue.TestDequeue()
+		item, nonempty := c.queue.Dequeue()
+		//item, nonempty := c.queue.TestDequeue()
 		if !nonempty {
 			break
 		}
-		fmt.Println(item)
+		// Test prints, to show they are dequeuing. These otherwise get sent to the PV
+		//fmt.Println(item)
+		PrintPodPB(item)
 	}
 
 	fmt.Println("Ending One Reconcile Print from ORB...")
 	fmt.Println()
+
+	// TODO: this is where I would batch log to the PV
+	// Caution!: When everything is a []byte, it could be hard to keep track of overall
+	// data structures (when am I getting a pod, a node, an instancetype etc.). Think of
+	// a way to keep things organized / together to better keep track (i.e. how are they indexed/referenced)
+
+	// TODO: How should I save a [][]byte (i.e. the pb queue) to a file (or multiple files?)
 
 	// // Save to the Persistent Volume
 	// err := c.SaveToPV("helloworld.txt", "sample_logline")
@@ -267,6 +277,36 @@ func OfferingToString(offering *cloudprovider.Offering) string {
 }
 
 // Function for logging everything in the Provisioner Scheduler (i.e. pending pods, statenodes...)
+func (q *Queue) LogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
+	fmt.Println("Logging from the Provisioner")
+
+	//log.FromContext(ctx).Info("Context input to scheduler.NewScheduler", "ctx", ctx)
+
+	//log.FromContext(ctx).Info("nodePools input to scheduler.NewScheduler", "nodePools", lo.ToSlicePtr(nodePoolList.Items))
+
+	// log.Info("cluster input to scheduler.NewScheduler", "cluster", p.cluster)
+
+	// Logs the pending pods
+	// log.FromContext(ctx).Info("Pending pods", "pods", lo.ToSlicePtr(pods))
+	q.LogPendingPods(pods)
+
+	// Log the state nodes
+	// log.FromContext(ctx).Info("State nodes", "stateNodes", lo.ToSlicePtr(stateNodes))
+	// q.LogStateNodes(stateNodes)
+
+	// Log the instance types
+	// log.FromContext(ctx).Info("Instance types", "instanceTypes", instanceTypes)
+	// q.LogInstanceTypes(instanceTypes)
+
+	// Log the topology
+	// log.FromContext(ctx).Info("Topology", "topology", topology)
+
+	//log.Info("daemonSetPods input to scheduler.NewScheduler", "daemonSetPods", daemonSetPods)
+
+	fmt.Println("End Provisioner Logging")
+}
+
+// Function for logging everything in the Provisioner Scheduler (i.e. pending pods, statenodes...)
 func (q *TestQueue) TestLogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
 	q.TestEnqueue("Testing from the Provisioner")
 
@@ -296,7 +336,40 @@ func (q *TestQueue) TestLogProvisioningScheduler(pods []*v1.Pod, stateNodes []*s
 	q.TestEnqueue("End Provisioner Test")
 }
 
-// Function for logging pending pods
+// Function for logging pending pods (as protobuf)
+// They are enqueued for batch logging. They'll get logged by the Reconciler
+func (q *Queue) LogPendingPods(pods []*v1.Pod) {
+	for _, pod := range pods {
+		data, err := pod.Marshal() //TODO: change to my marshaling instead of built-in
+		if err != nil {
+			fmt.Println("Error marshaling pod:", err)
+			return
+		}
+		q.Enqueue(data)
+	}
+}
+
+// For testing, pull pending pod and print as string.
+func UnmarshalPod(data []byte) (*v1.Pod, error) {
+	pod := &v1.Pod{}
+	if err := proto.Unmarshal(data, pod); err != nil {
+		fmt.Println("Error unmarshaling pod:", err)
+		return nil, err
+	}
+	return pod, nil
+}
+
+// Function to unmarshal and print a pod
+func PrintPodPB(data []byte) {
+	pod, err := UnmarshalPod(data)
+	if err != nil {
+		fmt.Println("Error deserializing pod:", err)
+		return
+	}
+	fmt.Println("Pod is: ", PodToString(pod))
+}
+
+// Function for test logging pending pods (as string)
 func (q *TestQueue) TestLogPendingPods(pods []*v1.Pod) {
 	// Test Log Pending Pods
 	for _, pod := range pods {
@@ -341,9 +414,13 @@ func (c *Controller) sanitizePath(path string) string {
 // The function opens a file for writing, writes some data to the file, and then closes the file
 func (c *Controller) SaveToPV(logname string, logline string) error {
 
+	// Set global variable(s) for Mounted PV path
+	//var mountPath = "/data"
+	var testPath = "/"
+
 	// Create the log file path and desired logline (example for now)
 	sanitizedname := c.sanitizePath(logname)
-	path := filepath.Join(mountPath, sanitizedname)
+	path := filepath.Join(testPath, sanitizedname)
 	//logline := fmt.Sprintf("Printing data (from %s) to the S3 bucket", logname)
 
 	// Opens the mounted volume (S3 Bucket) file at that path
