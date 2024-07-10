@@ -17,6 +17,7 @@ limitations under the License.
 package orbbatcher
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -62,6 +63,16 @@ func NewQueue() *Queue {
 		//RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(orbQueueBaseDelay, orbQueueMaxDelay)),
 		data: make([][]byte, 0),
 	}
+}
+
+func (q *Queue) toString() string {
+	var buf bytes.Buffer
+
+	for _, slice := range q.data {
+		buf.WriteString(fmt.Sprintf("%x\n", slice))
+	}
+
+	return buf.String()
 }
 
 func NewTestQueue() *TestQueue {
@@ -169,7 +180,10 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	fmt.Println("Starting One Reconcile Print from ORB...")
 
 	// set a blank []byte
-	sample_logline := []byte{}
+	//sample_logline := []byte{}
+
+	qstr := c.queue.toString()
+	fmt.Println(qstr)
 
 	//c.queue.TestEnqueue("Hello World from the ORB Batcher Reconciler")
 
@@ -184,7 +198,8 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// Test prints, to show they are dequeuing. These otherwise get sent to the PV
 		//fmt.Println(item)
 		PrintPodPB(item)
-		sample_logline = item
+		// sample_logline = item
+		// fmt.Println(sample_logline)
 	}
 
 	fmt.Println("Ending One Reconcile Print from ORB...")
@@ -198,7 +213,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	// TODO: How should I save a [][]byte (i.e. the pb queue) to a file (or multiple files?)
 
 	// Save to the Persistent Volume
-	err := c.SaveToPV("helloworld.txt", "sample_logline: "+string(sample_logline))
+	err := c.SaveToPV("helloworld_"+string(len(qstr))+".txt", "sample_logline: "+qstr)
 	if err != nil {
 		fmt.Println("Error saving to PV:", err)
 		return reconcile.Result{}, err
