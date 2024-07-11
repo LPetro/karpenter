@@ -318,7 +318,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 
 	//p.queue.LogProvisioningScheduler(pods, stateNodes, instanceTypes)
 
-	p.SIheap.SILogProvisioningScheduler(pods, stateNodes, instanceTypes)
+	p.SIheap.LogProvisioningScheduler(pods, stateNodes, instanceTypes)
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
 }

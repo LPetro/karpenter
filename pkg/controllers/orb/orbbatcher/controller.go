@@ -49,7 +49,34 @@ import (
 type SchedulingInput struct {
 	Timestamp   time.Time
 	PendingPods []*v1.Pod
-	//Node *v1.Node
+	//all the other scheduling inputs...
+}
+
+func (si SchedulingInput) String() string {
+	return fmt.Sprintf("Timestamp: %v\nPendingPods: %v", si.Timestamp, PodsToString(si.PendingPods))
+}
+
+// Function take a Scheduling Input to []byte, marshalled as a protobuf
+// TODO: With a custom-defined .proto, this will look different.
+func (si SchedulingInput) Marshal() ([]byte, error) {
+	podList := &v1.PodList{
+		Items: make([]v1.Pod, 0, len(si.PendingPods)),
+	}
+
+	for _, podPtr := range si.PendingPods {
+		podList.Items = append(podList.Items, *podPtr)
+	}
+	return podList.Marshal()
+}
+
+// Function to do the reverse, take a scheduling input's []byte and unmarshal it back into a SchedulingInput
+func PBToSchedulingInput(timestamp time.Time, data []byte) (SchedulingInput, error) {
+	podList := &v1.PodList{}
+	if err := proto.Unmarshal(data, podList); err != nil {
+		return SchedulingInput{}, fmt.Errorf("unmarshaling pod list, %w", err)
+	}
+	pods := lo.ToSlicePtr(podList.Items)
+	return ReconstructedSchedulingInput(timestamp, pods), nil
 }
 
 // This defines a min-heap of SchedulingInputs by slice,
@@ -86,7 +113,6 @@ func NewSchedulingInputHeap() *SchedulingInputHeap {
 	return h
 }
 
-// Create a new scheduling input
 func NewSchedulingInput(pendingPods []*v1.Pod) SchedulingInput {
 	return SchedulingInput{
 		Timestamp:   time.Now(),
@@ -120,35 +146,28 @@ func NewController(SIheap *SchedulingInputHeap) *Controller {
 // This function batches together loglines into our Queue data structure
 // This queue will be periodically dumped to the S3 Bucket
 func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
-	// TODO: what does this do / where does it reference to or need to reference to?
 	// ctx = injection.WithControllerName(ctx, "orb.batcher")
 
-	fmt.Println("Starting One Reconcile Print from ORB...")
+	fmt.Println("Starting One Reconcile Print from ORB...\n")
 
-	// For each scheduling input in my queue (c.queue), print to string and send to PV (also loopback test it)
+	// Pop each scheduling input off my heap (oldest first) and batch log in PV (also loopback test it)
 	for c.SIheap.Len() > 0 {
 		item := heap.Pop(c.SIheap).(SchedulingInput) // Min heap, so always pops the oldest
 
-		// Save to the Persistent Volume (maybe save as log_timestamp for uniqueness, or monotonically increasing counter)
 		err := c.SaveToPV(item)
 		if err != nil {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
 		}
 
-		// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
-		// In reality, we could just pull a file from a known directory
-		timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
-		fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
-		err = c.ReconstructSchedulingInput(fileName)
+		err = c.testReadPVandReconstruct(item)
 		if err != nil {
-			fmt.Println("Error reconstructing scheduling input:", err)
+			fmt.Println("Error reconstructing from PV:", err)
 			return reconcile.Result{}, err
 		}
 	}
 
-	fmt.Println("Ending One Reconcile Print from ORB...")
-	fmt.Println()
+	fmt.Println("Ending One Reconcile Print from ORB...\n")
 
 	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 }
@@ -164,7 +183,8 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 /* The following functions are testing toString functions that will mirror what the serialization
    deserialization functions will do in protobuf. These are inefficient, but human-readable */
 
-// TODO: Check if the fields exist before calling them.
+// TODO: This eventually will be "as simple" as reconstructing the data structures from
+// the log data and using K8S and/or Karpenter representation to present as JSON or YAML or something
 
 // This function as a human readable test function for serializing desired pod data
 // It takes in a v1.Pod and gets the string representations of all the fields we care about.
@@ -237,15 +257,8 @@ func OfferingToString(offering *cloudprovider.Offering) string {
 		RequirementsToString(&offering.Requirements), offering.Price, offering.Available)
 }
 
-// // Function for logging everything in the Provisioner Scheduler (i.e. pending pods, statenodes...)
-// func (q *Queue) LogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
-// 	fmt.Println("Logging from the Provisioner")
-
-// 	fmt.Println("End Provisioner Logging")
-// }
-
 // Function for logging everything in the Provisioner Scheduler (i.e. pending pods, statenodes...)
-func (q *SchedulingInputHeap) SILogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
+func (q *SchedulingInputHeap) LogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
 	fmt.Println("SI Logging from the Provisioner")
 
 	// Context, cluster, stateNodes, instanceTypes, topology...?
@@ -254,74 +267,6 @@ func (q *SchedulingInputHeap) SILogProvisioningScheduler(pods []*v1.Pod, stateNo
 
 	fmt.Println("End Provisioner SI Logging")
 }
-
-// Function take a Scheduling Input to string
-func SchedulingInputToString(si SchedulingInput) string {
-	// if si == (SchedulingInput{}) {
-	// 	return "<nil>"
-	// }
-	return fmt.Sprintf("Pending Pods: %s", PodsToString(si.PendingPods))
-}
-
-// This function serializes _ resource into protobuf
-
-// This functions deserialized _ resource into protobuf
-
-// Function take a Scheduling Input to []byte, marshalled as a protobuf
-func SchedulingInputToPB(si SchedulingInput) ([]byte, error) {
-	podList := &v1.PodList{
-		Items: make([]v1.Pod, 0, len(si.PendingPods)),
-	}
-
-	for _, podPtr := range si.PendingPods {
-		podList.Items = append(podList.Items, *podPtr)
-	}
-	return podList.Marshal()
-}
-
-// Function to do the reverse, take a scheduling input's []byte and unmarshal it back into a SchedulingInput
-func PBToSchedulingInput(timestamp time.Time, data []byte) (SchedulingInput, error) {
-	podList := &v1.PodList{}
-	if err := proto.Unmarshal(data, podList); err != nil {
-		return SchedulingInput{}, fmt.Errorf("unmarshaling pod list, %w", err)
-	}
-	pods := lo.ToSlicePtr(podList.Items)
-	return ReconstructedSchedulingInput(timestamp, pods), nil
-}
-
-// Function for logging pending pods (as protobuf)
-
-// Function take a []byte, marshalled as a protobuf, and deserialize it into a SchedulingInput
-
-// Function for logging pending pods (as protobuf)
-
-// For testing, pull pending pod and print as string.
-func UnmarshalPod(data []byte) (*v1.Pod, error) {
-	pod := &v1.Pod{}
-	if err := proto.Unmarshal(data, pod); err != nil {
-		fmt.Println("Error unmarshaling pod:", err)
-		return nil, err
-	}
-	return pod, nil
-}
-
-// Function to unmarshal and print a pod
-func PrintPodPB(data []byte) {
-	pod, err := UnmarshalPod(data)
-	if err != nil {
-		fmt.Println("Error deserializing pod:", err)
-		return
-	}
-	fmt.Println("Pod is: ", PodToString(pod))
-}
-
-// Similar for IT Capacity
-
-// func testPrintandPV() {
-// 	fmt.Println("Printing from the ORB Batcher Reconciler")
-// 	// Save to the Persistent Volume (maybe save as log_timestamp for uniqueness, or monotonically increasing counter)
-// 	err := SaveToPV("testfile.log", "sample_log: testPrintandPV")
-// }
 
 // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
 // They highly recommend sanitizing inputs before accessing that path.
@@ -342,12 +287,8 @@ func (c *Controller) sanitizePath(path string) string {
 // The function opens a file for writing, writes some data to the file, and then closes the file
 func (c *Controller) SaveToPV(item SchedulingInput) error {
 
-	// Set global variable(s) for Mounted PV path
-	var mountPath = "/data"
-
-	// Test prints, to show they are dequeuing. These otherwise get sent to the PV
-	fmt.Println(SchedulingInputToString(item))
-	logdata, err := SchedulingInputToPB(item)
+	fmt.Println("Saving Scheduling Input to PV: ", item.String()) // Test print
+	logdata, err := item.Marshal()
 	if err != nil {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
@@ -357,7 +298,7 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
 
-	path := filepath.Join(mountPath, fileName)
+	path := filepath.Join("/data", fileName) // mountPath = /data by PVC
 
 	// Opens the mounted volume (S3 Bucket) file at that path
 	file, err := os.Create(path)
@@ -384,11 +325,32 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	return nil
 }
 
+/* These will be part of the command-line printing representation... */
+
+// For testing, pull pending pod and print as string.
+func UnmarshalPod(data []byte) (*v1.Pod, error) {
+	pod := &v1.Pod{}
+	if err := proto.Unmarshal(data, pod); err != nil {
+		fmt.Println("Error unmarshaling pod:", err)
+		return nil, err
+	}
+	return pod, nil
+}
+
+// Function to unmarshal and print a pod
+func PrintPodPB(data []byte) {
+	pod, err := UnmarshalPod(data)
+	if err != nil {
+		fmt.Println("Error deserializing pod:", err)
+		return
+	}
+	fmt.Println("Pod is: ", PodToString(pod))
+}
+
 // Function to pull from an S3 bucket
 func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
-	var mountPath = "/data"
 	sanitizedname := c.sanitizePath(logname)
-	path := filepath.Join(mountPath, sanitizedname)
+	path := filepath.Join("/data", sanitizedname)
 
 	// Open the file for reading
 	file, err := os.Open(path)
@@ -444,6 +406,20 @@ func (c *Controller) ReconstructSchedulingInput(fileName string) error {
 		return err
 	}
 	// Print the reconstructed scheduling input
-	fmt.Println("Reconstructed Scheduling Input looks like: " + SchedulingInputToString(si))
+	fmt.Println("Reconstructed Scheduling Input looks like: " + si.String())
+	return nil
+}
+
+func (c *Controller) testReadPVandReconstruct(item SchedulingInput) error {
+	// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
+	// In reality, we could just pull a file from a known directory
+	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
+
+	err := c.ReconstructSchedulingInput(fileName)
+	if err != nil {
+		fmt.Println("Error reconstructing scheduling input:", err)
+		return err
+	}
 	return nil
 }
