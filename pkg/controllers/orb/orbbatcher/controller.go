@@ -77,6 +77,7 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 	// Iterate over the slice of Pods and marshal each one to its wire format
 	for _, pod := range si.PendingPods {
 		podData, err := proto.Marshal(pod)
+		fmt.Println("podData:", podData)
 		if err != nil {
 			fmt.Println("Error marshaling pod:", err)
 			continue
@@ -86,9 +87,11 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 
 	// Create an ORBLogEntry message
 	entry := &ORBLogEntry{
-		//Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
+		Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
 		PendingpodData: podDataSlice,
 	}
+	test, _ := proto.Marshal(entry)
+	fmt.Println("These should look like bytes...", test)
 
 	return proto.Marshal(entry)
 }
