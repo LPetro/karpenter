@@ -53,7 +53,9 @@ type SchedulingInput struct {
 }
 
 func (si SchedulingInput) String() string {
-	return fmt.Sprintf("Timestamp: %v\nPendingPods: %v", si.Timestamp, PodsToString(si.PendingPods))
+	return fmt.Sprintf("Timestamp: %v\nPendingPods: %v",
+		si.Timestamp.Format("2006-01-02_15-04-05"),
+		PodsToString(si.PendingPods))
 }
 
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
@@ -148,7 +150,7 @@ func NewController(SIheap *SchedulingInputHeap) *Controller {
 func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	// ctx = injection.WithControllerName(ctx, "orb.batcher")
 
-	fmt.Println("Starting One Reconcile Print from ORB...\n")
+	fmt.Println("----------  Starting a Reconcile Print from ORB  ----------")
 
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV (also loopback test it)
 	for c.SIheap.Len() > 0 {
@@ -167,7 +169,8 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		}
 	}
 
-	fmt.Println("Ending One Reconcile Print from ORB...\n")
+	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
+	fmt.Println()
 
 	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 }
@@ -287,7 +290,7 @@ func (c *Controller) sanitizePath(path string) string {
 // The function opens a file for writing, writes some data to the file, and then closes the file
 func (c *Controller) SaveToPV(item SchedulingInput) error {
 
-	fmt.Println("Saving Scheduling Input to PV: ", item.String()) // Test print
+	fmt.Println("Saving Scheduling Input to PV:\n", item.String()) // Test print
 	logdata, err := item.Marshal()
 	if err != nil {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
@@ -406,7 +409,7 @@ func (c *Controller) ReconstructSchedulingInput(fileName string) error {
 		return err
 	}
 	// Print the reconstructed scheduling input
-	fmt.Println("Reconstructed Scheduling Input looks like: " + si.String())
+	fmt.Println("Reconstructed Scheduling Input looks like:\n" + si.String())
 	return nil
 }
 
