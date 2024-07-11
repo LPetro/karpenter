@@ -53,7 +53,7 @@ type SchedulingInput struct {
 }
 
 func (si SchedulingInput) String() string {
-	return fmt.Sprintf("Timestamp: %v\nPendingPods: %v",
+	return fmt.Sprintf("Timestamp: %v\nPendingPods:\n%v",
 		si.Timestamp.Format("2006-01-02_15-04-05"),
 		PodsToString(si.PendingPods))
 }
@@ -262,26 +262,8 @@ func OfferingToString(offering *cloudprovider.Offering) string {
 
 // Function for logging everything in the Provisioner Scheduler (i.e. pending pods, statenodes...)
 func (q *SchedulingInputHeap) LogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
-	fmt.Println("SI Logging from the Provisioner")
-
-	// Context, cluster, stateNodes, instanceTypes, topology...?
-	si := NewSchedulingInput(pods)
-	q.Push(si) // sends that scheduling input into the data structure to be popped in batch to go to PV as a protobuf
-
-	fmt.Println("End Provisioner SI Logging")
-}
-
-// Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
-// They highly recommend sanitizing inputs before accessing that path.
-func (c *Controller) sanitizePath(path string) string {
-	// Remove any leading or trailing slashes, "../" or "./"...
-	path = strings.TrimPrefix(path, "/")
-	path = strings.TrimSuffix(path, "/")
-	path = regexp.MustCompile(`\.\.\/`).ReplaceAllString(path, "")
-	path = regexp.MustCompile(`\.\/`).ReplaceAllString(path, "")
-	path = strings.ReplaceAll(path, "../", "")
-
-	return path
+	si := NewSchedulingInput(pods) // TODO: add all inputs I want to log
+	q.Push(si)                     // sends that scheduling input into the data structure to be popped in batch to go to PV as a protobuf
 }
 
 /* This function saves things to our Persistent Volume */
@@ -350,6 +332,19 @@ func PrintPodPB(data []byte) {
 	fmt.Println("Pod is: ", PodToString(pod))
 }
 
+// Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
+// They highly recommend sanitizing inputs before accessing that path.
+func (c *Controller) sanitizePath(path string) string {
+	// Remove any leading or trailing slashes, "../" or "./"...
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimSuffix(path, "/")
+	path = regexp.MustCompile(`\.\.\/`).ReplaceAllString(path, "")
+	path = regexp.MustCompile(`\.\/`).ReplaceAllString(path, "")
+	path = strings.ReplaceAll(path, "../", "")
+
+	return path
+}
+
 // Function to pull from an S3 bucket
 func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
 	sanitizedname := c.sanitizePath(logname)
@@ -362,6 +357,8 @@ func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
 		return time.Time{}, nil, err
 	}
 	defer file.Close()
+
+	// TODO: This will be as simple as an io.ReadAll for all the contents, once I customize an SI .proto
 
 	// Create a new buffered reader
 	reader := bufio.NewReader(file)

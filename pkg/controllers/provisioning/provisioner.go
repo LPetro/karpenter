@@ -313,11 +313,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 		return nil, fmt.Errorf("getting daemon pods, %w", err)
 	}
 
-	// Runs a few test logs that ORB should run. It queues as strings not pbs yet, and not to PV yet.
-	//p.queue.TestLogProvisioningScheduler(pods, stateNodes, instanceTypes)
-
-	//p.queue.LogProvisioningScheduler(pods, stateNodes, instanceTypes)
-
+	// fmt.Println("SI Logging from the Provisioner")
 	p.SIheap.LogProvisioningScheduler(pods, stateNodes, instanceTypes)
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
