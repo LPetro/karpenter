@@ -348,6 +348,13 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	}
 	defer file.Close()
 
+	// Writes data to the file
+	_, err = fmt.Fprintln(file, timestampStr)
+	if err != nil {
+		fmt.Println("Error writing timestamp to file:", err)
+		return err
+	}
+
 	_, err = file.Write(logdata)
 	if err != nil {
 		fmt.Println("Error writing data to file:", err)
