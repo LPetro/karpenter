@@ -86,7 +86,7 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 
 	// Create an ORBLogEntry message
 	entry := &ORBLogEntry{
-		Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
+		//Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
 		PendingpodData: podDataSlice,
 	}
 
