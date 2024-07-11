@@ -352,6 +352,8 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 		return err
 	}
 
+	fmt.Println("Data written to PV: ", logdata)
+
 	fmt.Println("Data written to S3 bucket successfully!")
 	return nil
 }
@@ -445,6 +447,8 @@ func (c *Controller) ReconstructSchedulingInput(fileName string) error {
 		fmt.Println("Error reading from PV:", err)
 		return err
 	}
+
+	fmt.Println("Read data from PV", readdata)
 
 	// Protobuff to si
 	si, err := UnmarshalSchedulingInput(readdata)
