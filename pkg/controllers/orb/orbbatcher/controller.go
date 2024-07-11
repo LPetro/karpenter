@@ -58,17 +58,39 @@ func (si SchedulingInput) String() string {
 		PodsToString(si.PendingPods))
 }
 
+// Function takes a slice of pod pointers and returns a string representation of the pods
+
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
 // TODO: With a custom-defined .proto, this will look different.
 func (si SchedulingInput) Marshal() ([]byte, error) {
-	podList := &v1.PodList{
-		Items: make([]v1.Pod, 0, len(si.PendingPods)),
+	// podList := &v1.PodList{
+	// 	Items: make([]v1.Pod, 0, len(si.PendingPods)),
+	// }
+
+	// for _, podPtr := range si.PendingPods {
+	// 	podList.Items = append(podList.Items, *podPtr)
+	// }
+	// return podList.Marshal()
+	// Create a slice to store the wire format data
+	podDataSlice := make([][]byte, 0, len(si.PendingPods))
+
+	// Iterate over the slice of Pods and marshal each one to its wire format
+	for _, pod := range si.PendingPods {
+		podData, err := proto.Marshal(pod)
+		if err != nil {
+			fmt.Println("Error marshaling pod:", err)
+			continue
+		}
+		podDataSlice = append(podDataSlice, podData)
 	}
 
-	for _, podPtr := range si.PendingPods {
-		podList.Items = append(podList.Items, *podPtr)
+	// Create an ORBLogEntry message
+	entry := &ORBLogEntry{
+		Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
+		PendingpodData: podDataSlice,
 	}
-	return podList.Marshal()
+
+	return proto.Marshal(entry)
 }
 
 // Function to do the reverse, take a scheduling input's []byte and unmarshal it back into a SchedulingInput
@@ -162,11 +184,11 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			return reconcile.Result{}, err
 		}
 
-		err = c.testReadPVandReconstruct(item)
-		if err != nil {
-			fmt.Println("Error reconstructing from PV:", err)
-			return reconcile.Result{}, err
-		}
+		// err = c.testReadPVandReconstruct(item)
+		// if err != nil {
+		// 	fmt.Println("Error reconstructing from PV:", err)
+		// 	return reconcile.Result{}, err
+		// }
 	}
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
