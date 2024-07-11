@@ -17,7 +17,9 @@ limitations under the License.
 package orbbatcher
 
 import (
+	"bufio"
 	"bytes"
+	"container/heap"
 	"context"
 	"fmt"
 	"io"
@@ -56,16 +58,44 @@ type Queue struct {
 	data [][]byte
 }
 
-type SchedulingInputQueue struct {
-	mu     sync.Mutex
-	inputs []SchedulingInput
-}
+// type SchedulingInputHeap struct {
+// 	mu     sync.Mutex
+// 	inputs []SchedulingInput
+// }
 
 // Timestamp, dynamic inputs (like pending pods, statenodes, etc.)
 type SchedulingInput struct {
-	//Timestamp time.Time
+	Timestamp   time.Time
 	PendingPods []*v1.Pod
 	//Node *v1.Node
+}
+
+// This defines a min-heap of SchedulingInputs by slice,
+// with the Timestamp field defined as the comparator
+type SchedulingInputHeap []SchedulingInput //heaps are thread-safe in container/heap
+
+func (h SchedulingInputHeap) Len() int {
+	return len(h)
+}
+
+func (h SchedulingInputHeap) Less(i, j int) bool {
+	return h[i].Timestamp.Before(h[j].Timestamp)
+}
+
+func (h SchedulingInputHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+}
+
+func (h *SchedulingInputHeap) Push(x interface{}) {
+	*h = append(*h, x.(SchedulingInput))
+}
+
+func (h *SchedulingInputHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
 }
 
 type TestQueue struct {
@@ -90,10 +120,16 @@ func (q *Queue) toString() string {
 	return buf.String()
 }
 
-func NewSchedulingInputQueue() *SchedulingInputQueue {
-	return &SchedulingInputQueue{
-		inputs: make([]SchedulingInput, 0),
-	}
+// func NewSchedulingInputQueue() *SchedulingInputQueue {
+// 	return &SchedulingInputQueue{
+// 		inputs: make([]SchedulingInput, 0),
+// 	}
+// }
+
+func NewSchedulingInputHeap() *SchedulingInputHeap {
+	h := &SchedulingInputHeap{}
+	heap.Init(h)
+	return h
 }
 
 func NewTestQueue() *TestQueue {
@@ -135,27 +171,36 @@ func (q *TestQueue) TestDequeue() (string, bool) {
 	return item, true
 }
 
-// SchedulingInputEnqueue
-func (q *SchedulingInputQueue) Enqueue(si SchedulingInput) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.inputs = append(q.inputs, si)
-}
+// // SchedulingInputEnqueue
+// func (q *SchedulingInputQueue) Enqueue(si SchedulingInput) {
+// 	q.mu.Lock()
+// 	defer q.mu.Unlock()
+// 	q.inputs = append(q.inputs, si)
+// }
 
-func (q *SchedulingInputQueue) Dequeue() (SchedulingInput, bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if len(q.inputs) == 0 {
-		return SchedulingInput{}, false
-	}
-	item := q.inputs[0]
-	q.inputs = q.inputs[1:]
-	return item, true
-}
+// func (q *SchedulingInputQueue) Dequeue() (SchedulingInput, bool) {
+// 	q.mu.Lock()
+// 	defer q.mu.Unlock()
+// 	if len(q.inputs) == 0 {
+// 		return SchedulingInput{}, false
+// 	}
+// 	item := q.inputs[0]
+// 	q.inputs = q.inputs[1:]
+// 	return item, true
+// }
 
 // Create a new scheduling input
 func NewSchedulingInput(pendingPods []*v1.Pod) SchedulingInput {
 	return SchedulingInput{
+		Timestamp:   time.Now(),
+		PendingPods: pendingPods,
+	}
+}
+
+// Create a new scheduling input
+func ReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod) SchedulingInput {
+	return SchedulingInput{
+		Timestamp:   timestamp,
 		PendingPods: pendingPods,
 	}
 }
@@ -171,49 +216,18 @@ func (q *TestQueue) LogLine(item string) {
 	q.TestEnqueue(item) // Currently passing in a string, not a binary.
 }
 
-// // This is an initial protobuf serializing log. I'll need a deserializer too, to read.
-// func LogEvent(timestamp, eventType, message string, tags []string) error {
-// 	entry := &ORBLogEntry{
-// 		Timestamp: timestamp,
-// 		EventType: eventType,
-// 		Message:   message,
-// 		Tags:      tags,
-// 	}
-// 	data, err := proto.Marshal(entry)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	// Write the serialized data to the log
-// 	return WriteToLog(data)
-// }
-
-// Deserialize and JSON marshal cluster
-// clusterJSON, err := json.Marshal(p.cluster)
-// if err != nil {
-// 	return nil, fmt.Errorf("marshaling cluster, %w", err)
-// }
-// fmt.Println(string(clusterJSON))
-
-// Also only do this is pending pods has changed.
-// fmt.Println("Pod 0:", pods[0])
-// fmt.Print("Marshaled Pod 0: ")
-// fmt.Println(pods[0].Marshal()) // I think this saves as protobuf intrinsically, using k8s api generated.pb.go
-// k8s.io/api/core/v1/generated.proto
-
-// This function serializes _ resource into protobuf
-
-// This functions deserialized _ resource into protobuf
-
 type Controller struct {
-	queue *SchedulingInputQueue // Batches logs in a Queue
-	//testqueue *TestQueue
+	SIheap             *SchedulingInputHeap // Batches logs in a Queue
+	mostRecentFilename string               // The most recently saved filename (for checking for changes)
 }
 
 // TODO: add struct elements and their instantiations, when defined
-func NewController(queue *SchedulingInputQueue) *Controller {
+func NewController(SIheap *SchedulingInputHeap) *Controller {
 	return &Controller{
-		queue: queue,
-		//testqueue: queue,
+		SIheap:             SIheap,
+		mostRecentFilename: "", // Initialize with an empty string
+		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
+		//      That would have to be a delete/replace since PV files are immutable.
 	}
 }
 
@@ -225,17 +239,14 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	fmt.Println("Starting One Reconcile Print from ORB...")
 
-	// qstr := c.queue.toString()
-	// fmt.Println(qstr)
-
-	//qstr := SchedulingInputToString(c.queue)
-
 	// For each scheduling input in my queue (c.queue), print to string and send to PV
-	for {
-		item, nonempty := c.queue.Dequeue()
-		if !nonempty {
-			break
-		}
+	for c.SIheap.Len() > 0 {
+		// item, nonempty := c.queue.Dequeue()
+		// if !nonempty {
+		// 	break
+		// }
+		item := heap.Pop(c.SIheap).(SchedulingInput) // Min heap, so always pops the oldest
+
 		// Test prints, to show they are dequeuing. These otherwise get sent to the PV
 		fmt.Println(SchedulingInputToString(item))
 		data, err := SchedulingInputToPB(item)
@@ -245,26 +256,25 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		}
 
 		// Timestamp the file
-		now := time.Now()
-		timestampStr := now.Format("2006-01-02_15-04-05")
+		timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 		fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
 
 		// Save to the Persistent Volume (maybe save as log_timestamp for uniqueness, or monotonically increasing counter)
-		err = c.SaveToPV(fileName, data)
+		err = c.SaveToPV(fileName, timestampStr, data)
 		if err != nil {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
 		}
 
 		// Read from the PV to check (will be what the ORB tool does from the Command Line)
-		readdata, err := c.ReadFromPV(fileName)
+		readTimestamp, readdata, err := c.ReadFromPV(fileName)
 		if err != nil {
 			fmt.Println("Error reading from PV:", err)
 			return reconcile.Result{}, err
 		}
 
 		// Protobuff to si
-		si, err := PBToSchedulingInput(readdata)
+		si, err := PBToSchedulingInput(readTimestamp, readdata)
 		if err != nil {
 			fmt.Println("Error converting PB to SI:", err)
 			return reconcile.Result{}, err
@@ -427,11 +437,11 @@ func (q *Queue) LogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.Sta
 }
 
 // Function for logging everything in the Provisioner Scheduler (i.e. pending pods, statenodes...)
-func (q *SchedulingInputQueue) SILogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
+func (q *SchedulingInputHeap) SILogProvisioningScheduler(pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
 	fmt.Println("SI Logging from the Provisioner")
 
 	si := NewSchedulingInput(pods)
-	q.Enqueue(si) // sends that scheduling input into the data structure to be dequeued in batch to go to PV as a protobuf
+	q.Push(si) // sends that scheduling input into the data structure to be popped in batch to go to PV as a protobuf
 
 	fmt.Println("End Provisioner SI Logging")
 }
@@ -443,6 +453,10 @@ func SchedulingInputToString(si SchedulingInput) string {
 	// }
 	return fmt.Sprintf("Pending Pods: %s", PodsToString(si.PendingPods))
 }
+
+// This function serializes _ resource into protobuf
+
+// This functions deserialized _ resource into protobuf
 
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
 func SchedulingInputToPB(si SchedulingInput) ([]byte, error) {
@@ -457,13 +471,13 @@ func SchedulingInputToPB(si SchedulingInput) ([]byte, error) {
 }
 
 // Function to do the reverse, take a scheduling input's []byte and unmarshal it back into a SchedulingInput
-func PBToSchedulingInput(data []byte) (SchedulingInput, error) {
+func PBToSchedulingInput(timestamp time.Time, data []byte) (SchedulingInput, error) {
 	podList := &v1.PodList{}
 	if err := proto.Unmarshal(data, podList); err != nil {
 		return SchedulingInput{}, fmt.Errorf("unmarshaling pod list, %w", err)
 	}
 	pods := lo.ToSlicePtr(podList.Items)
-	return NewSchedulingInput(pods), nil
+	return ReconstructedSchedulingInput(timestamp, pods), nil
 }
 
 // Function for logging pending pods (as protobuf)
@@ -584,7 +598,7 @@ func (c *Controller) sanitizePath(path string) string {
 // Saves data to PV (S3 Bucket for AWS) via the mounted log path
 // It takes a name of the log file as well as the logline to be logged.
 // The function opens a file for writing, writes some data to the file, and then closes the file
-func (c *Controller) SaveToPV(logname string, logdata []byte) error {
+func (c *Controller) SaveToPV(logname string, timestampStr string, logdata []byte) error {
 
 	// Set global variable(s) for Mounted PV path
 	var mountPath = "/data"
@@ -604,9 +618,15 @@ func (c *Controller) SaveToPV(logname string, logdata []byte) error {
 
 	// Writes data to the file
 	//_, err = fmt.Fprintln(file, logdata)
+	_, err = fmt.Fprintln(file, timestampStr)
+	if err != nil {
+		fmt.Println("Error writing timestamp to file:", err)
+		return err
+	}
+
 	_, err = file.Write(logdata)
 	if err != nil {
-		fmt.Println("Error writing to file:", err)
+		fmt.Println("Error writing data to file:", err)
 		return err
 	}
 
@@ -615,7 +635,7 @@ func (c *Controller) SaveToPV(logname string, logdata []byte) error {
 }
 
 // Function to pull from an S3 bucket
-func (c *Controller) ReadFromPV(logname string) ([]byte, error) {
+func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
 	var mountPath = "/data"
 	sanitizedname := c.sanitizePath(logname)
 	path := filepath.Join(mountPath, sanitizedname)
@@ -624,16 +644,41 @@ func (c *Controller) ReadFromPV(logname string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
-		return nil, err
+		return time.Time{}, nil, err
 	}
 	defer file.Close()
 
-	// Read the contents of the file
-	contents, err := io.ReadAll(file)
+	// Create a new buffered reader
+	reader := bufio.NewReader(file)
+
+	// Read the first line as a string
+	timestampStr, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return nil, err
+		fmt.Println("Error reading timestamp:", err)
+		return time.Time{}, nil, err
+	}
+	timestampStr = strings.TrimSuffix(timestampStr, "\n")
+	fmt.Println("Timestamp:", timestampStr)
+
+	// Read the remaining bytes
+	contents, err := io.ReadAll(reader)
+	if err != nil {
+		fmt.Println("Error reading file bytes:", err)
+		return time.Time{}, nil, err
 	}
 
-	return contents, nil
+	// // Read the contents of the file
+	// contents, err := io.ReadAll(file)
+	// if err != nil {
+	// 	fmt.Println("Error reading file:", err)
+	// 	return nil, err
+	// }
+
+	timestamp, err := time.Parse("2006-01-02_15-04-05", timestampStr)
+	if err != nil {
+		fmt.Println("Error parsing timestamp:", err)
+		return time.Time{}, nil, err
+	}
+
+	return timestamp, contents, nil
 }
