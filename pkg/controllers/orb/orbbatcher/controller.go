@@ -17,7 +17,6 @@ limitations under the License.
 package orbbatcher
 
 import (
-	"bufio"
 	"bytes"
 	"container/heap"
 	"context"
@@ -77,7 +76,6 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 	// Iterate over the slice of Pods and marshal each one to its wire format
 	for _, pod := range si.PendingPods {
 		podData, err := proto.Marshal(pod)
-		fmt.Println("podData:", podData)
 		if err != nil {
 			fmt.Println("Error marshaling pod:", err)
 			continue
@@ -90,10 +88,40 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 		Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
 		PendingpodData: podDataSlice,
 	}
-	test, _ := proto.Marshal(entry)
-	fmt.Println("These should look like bytes...", test)
 
 	return proto.Marshal(entry)
+}
+
+func UnmarshalSchedulingInput(data []byte) (*SchedulingInput, error) {
+	// Unmarshal the data into an ORBLogEntry struct
+	entry := &ORBLogEntry{}
+	if err := proto.Unmarshal(data, entry); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ORBLogEntry: %v", err)
+	}
+
+	// Parse the timestamp
+	timestamp, err := time.Parse("2006-01-02_15-04-05", entry.Timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse timestamp: %v", err)
+	}
+
+	// Unmarshal the PendingpodData into v1.Pod objects
+	pendingPods := make([]*v1.Pod, 0, len(entry.PendingpodData))
+	for _, podData := range entry.PendingpodData {
+		var pod v1.Pod
+		if err := proto.Unmarshal(podData, &pod); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal pod: %v", err)
+		}
+		pendingPods = append(pendingPods, &pod)
+	}
+
+	// Create a new SchedulingInput struct
+	schedulingInput := &SchedulingInput{
+		Timestamp:   timestamp,
+		PendingPods: pendingPods,
+	}
+
+	return schedulingInput, nil
 }
 
 // Function to do the reverse, take a scheduling input's []byte and unmarshal it back into a SchedulingInput
@@ -187,11 +215,11 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			return reconcile.Result{}, err
 		}
 
-		// err = c.testReadPVandReconstruct(item)
-		// if err != nil {
-		// 	fmt.Println("Error reconstructing from PV:", err)
-		// 	return reconcile.Result{}, err
-		// }
+		err = c.testReadPVandReconstruct(item)
+		if err != nil {
+			fmt.Println("Error reconstructing from PV:", err)
+			return reconcile.Result{}, err
+		}
 	}
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
@@ -318,13 +346,6 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	}
 	defer file.Close()
 
-	// // Writes data to the file
-	// _, err = fmt.Fprintln(file, timestampStr)
-	// if err != nil {
-	// 	fmt.Println("Error writing timestamp to file:", err)
-	// 	return err
-	// }
-
 	_, err = file.Write(logdata)
 	if err != nil {
 		fmt.Println("Error writing data to file:", err)
@@ -385,47 +406,49 @@ func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
 
 	// TODO: This will be as simple as an io.ReadAll for all the contents, once I customize an SI .proto
 
-	// Create a new buffered reader
-	reader := bufio.NewReader(file)
+	// // Create a new buffered reader
+	// reader := bufio.NewReader(file)
 
-	// Read the first line as a string
-	timestampStr, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading timestamp:", err)
-		return time.Time{}, nil, err
-	}
-	timestampStr = strings.TrimSuffix(timestampStr, "\n")
+	// // Read the first line as a string
+	// timestampStr, err := reader.ReadString('\n')
+	// if err != nil {
+	// 	fmt.Println("Error reading timestamp:", err)
+	// 	return time.Time{}, nil, err
+	// }
+	// timestampStr = strings.TrimSuffix(timestampStr, "\n")
 
 	// Read the remaining bytes
 	// TODO: This will be bytes at a time until a newline, which will follow a schema
 	// defined for Scheduling Inputs in order to best keep track of protobufs and reconstruct
-	contents, err := io.ReadAll(reader)
+	contents, err := io.ReadAll(file)
 	if err != nil {
 		fmt.Println("Error reading file bytes:", err)
 		return time.Time{}, nil, err
 	}
 
-	timestamp, err := time.Parse("2006-01-02_15-04-05", timestampStr)
-	if err != nil {
-		fmt.Println("Error parsing timestamp:", err)
-		return time.Time{}, nil, err
-	}
+	// timestamp, err := time.Parse("2006-01-02_15-04-05", timestampStr)
+	// if err != nil {
+	// 	fmt.Println("Error parsing timestamp:", err)
+	// 	return time.Time{}, nil, err
+	// }
 
-	return timestamp, contents, nil
+	return time.Time{}, contents, nil
 }
 
 // Function for reconstructing inputs
 func (c *Controller) ReconstructSchedulingInput(fileName string) error {
 
 	// Read from the PV to check (will be what the ORB tool does from the Command Line)
-	readTimestamp, readdata, err := c.ReadFromPV(fileName)
+	//readTimestamp, readdata, err := c.ReadFromPV(fileName)
+	_, readdata, err := c.ReadFromPV(fileName)
 	if err != nil {
 		fmt.Println("Error reading from PV:", err)
 		return err
 	}
 
 	// Protobuff to si
-	si, err := PBToSchedulingInput(readTimestamp, readdata)
+	si, err := UnmarshalSchedulingInput(readdata)
+	//si, err := PBToSchedulingInput(readTimestamp, readdata)
 	if err != nil {
 		fmt.Println("Error converting PB to SI:", err)
 		return err
