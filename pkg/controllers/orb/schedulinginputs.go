@@ -158,7 +158,7 @@ func PodToString(pod *v1.Pod) string {
 	if pod == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Name: %s, Namespace: %s, Phase: %s, NodeName: %s", pod.Name, pod.Namespace, pod.Status.Phase, pod.Spec.NodeName)
+	return fmt.Sprintf("Name: %s,\nNamespace: %s,\nPhase: %s,\nNodeName: %s", pod.Name, pod.Namespace, pod.Status.Phase, pod.Spec.NodeName)
 }
 
 func PodsToString(pods []*v1.Pod) string {
@@ -177,7 +177,7 @@ func StateNodeToString(node *state.StateNode) string {
 	if node == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Node: %s, NodeClaim: %s", NodeToString(node.Node), NodeClaimToString(node.NodeClaim))
+	return fmt.Sprintf("Node: %s,\nNodeClaim: %s", NodeToString(node.Node), NodeClaimToString(node.NodeClaim))
 }
 
 func StateNodesToString(nodes []*state.StateNode) string {
@@ -196,7 +196,7 @@ func NodeToString(node *v1.Node) string {
 	if node == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Name: %s, Status: %s, NodeName: %s", node.Name, node.Status.Phase, node.Status.NodeInfo.SystemUUID)
+	return fmt.Sprintf("Name: %s,\nStatus: %s,\nNodeName: %s", node.Name, node.Status.Phase, node.Status.NodeInfo.SystemUUID)
 }
 
 // Similar function for NodeClaim
@@ -213,7 +213,7 @@ func InstanceTypeToString(instanceType *cloudprovider.InstanceType) string {
 		return "<nil>"
 	}
 	// TODO: String print the sub-types, like Offerings, too, all of them
-	return fmt.Sprintf("Name: %s, Requirements: %s, Offerings: %s", instanceType.Name,
+	return fmt.Sprintf("Name: %s,\nRequirements: %s,\nOfferings: %s", instanceType.Name,
 		RequirementsToString(&instanceType.Requirements), OfferingToString(&instanceType.Offerings[0]))
 }
 
@@ -236,11 +236,10 @@ func RequirementsToString(requirements *scheduling.Requirements) string {
 	return fmt.Sprintf("Requirements: %s", requirements)
 }
 
-// Similar for IT Offerings (Requirements, Price, Availability)
+// Similar for IT Offerings (Price, Availability)
 func OfferingToString(offering *cloudprovider.Offering) string {
 	if offering == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Offering Requirements: %s, Price: %f, Available: %t",
-		RequirementsToString(&offering.Requirements), offering.Price, offering.Available)
+	return fmt.Sprintf("Offering Price: %f,\nAvailable: %t", offering.Price, offering.Available)
 }
