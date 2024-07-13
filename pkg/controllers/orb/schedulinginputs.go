@@ -170,7 +170,7 @@ func PodsToString(pods []*v1.Pod) string {
 	}
 	var buf bytes.Buffer
 	for _, pod := range pods {
-		buf.WriteString(StripPod(pod).String() + "\n")
+		buf.WriteString(PodToString(StripPod(pod)) + "\n")
 		//buf.WriteString(PodToString(pod) + "\n") // TODO: Can replace with pod.String() if I want/need
 	}
 	return buf.String()
