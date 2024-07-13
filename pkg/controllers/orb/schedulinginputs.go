@@ -42,6 +42,15 @@ type SchedulingInput struct {
 	//all the other scheduling inputs...
 }
 
+func (si SchedulingInput) Reduce() SchedulingInput {
+	return SchedulingInput{
+		Timestamp:     si.Timestamp,
+		PendingPods:   reducePods(si.PendingPods),
+		StateNodes:    reduceStateNodes(si.StateNodes),
+		InstanceTypes: reduceInstanceTypes(si.InstanceTypes),
+	}
+}
+
 // TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
 // which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
 func (si SchedulingInput) String() string {
@@ -51,7 +60,6 @@ func (si SchedulingInput) String() string {
 		StateNodesToString(si.StateNodes),
 		InstanceTypesToString(si.InstanceTypes),
 	)
-
 }
 
 // Function takes a slice of pod pointers and returns a string representation of the pods
@@ -170,8 +178,7 @@ func PodsToString(pods []*v1.Pod) string {
 	}
 	var buf bytes.Buffer
 	for _, pod := range pods {
-		buf.WriteString(PodToString(StripPod(pod)) + "\n")
-		//buf.WriteString(PodToString(pod) + "\n") // TODO: Can replace with pod.String() if I want/need
+		buf.WriteString(PodToString(pod) + "\n") // TODO: Can replace with pod.String() if I want/need
 	}
 	return buf.String()
 }
@@ -251,20 +258,92 @@ func OfferingToString(offering *cloudprovider.Offering) string {
 	return fmt.Sprintf("Offering Price: %f,\nAvailable: %t", offering.Price, offering.Available)
 }
 
-// Potential stripping commands
+// Resource reducing commands
 
-// Strips a Pod to only the constituent parts we care about (i.e. Name, Namespace and Phase)
-func StripPod(pod *v1.Pod) *v1.Pod {
-	strippedPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		},
-		Status: v1.PodStatus{
-			Phase: pod.Status.Phase,
-		},
+// Reduces a Pod to only the constituent parts we care about (i.e. Name, Namespace and Phase)
+func reducePods(pods []*v1.Pod) []*v1.Pod {
+	var strippedPods []*v1.Pod
+
+	for _, pod := range pods {
+		strippedPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+			Status: v1.PodStatus{
+				Phase: pod.Status.Phase,
+			},
+		}
+		strippedPods = append(strippedPods, strippedPod)
 	}
-	//Test Print
-	fmt.Println("Stripped Pod: ", strippedPod.String())
-	return strippedPod
+
+	return strippedPods
+}
+
+func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
+	var strippedNodes []*state.StateNode
+
+	for _, node := range nodes {
+		strippedNode := &state.StateNode{
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: node.Node.Name,
+				},
+				Status: node.Node.Status,
+			},
+			NodeClaim: &v1beta1.NodeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: node.NodeClaim.Name,
+				},
+			},
+		}
+		strippedNodes = append(strippedNodes, strippedNode)
+	}
+
+	return strippedNodes
+}
+
+func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings {
+	var strippedOfferings cloudprovider.Offerings
+
+	for _, offering := range offerings {
+		strippedOffering := &cloudprovider.Offering{
+			Price:     offering.Price,
+			Available: offering.Available,
+		}
+		strippedOfferings = append(strippedOfferings, *strippedOffering) // TODO am I handling this pointer dereference right?
+	}
+
+	return strippedOfferings
+}
+
+// Grab only these key'd values from requirements... karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
+func reduceRequirements(requirements scheduling.Requirements) scheduling.Requirements {
+	// Create a new map to store the reduced requirements
+	reducedRequirements := make(scheduling.Requirements)
+
+	// Iterate over the requirements map and add the relevant keys and values to the reducedRequirements map
+	for key, value := range requirements {
+		switch key {
+		case "karpenter.sh/capacity-type", "topology.k8s.aws/zone-id", "topology.kubernetes.io/zone":
+			reducedRequirements[key] = value
+		}
+	}
+
+	return reducedRequirements
+}
+
+func reduceInstanceTypes(types []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
+	var strippedTypes []*cloudprovider.InstanceType
+
+	for _, instanceType := range types {
+		strippedType := &cloudprovider.InstanceType{
+			Name:         instanceType.Name,
+			Requirements: reduceRequirements(instanceType.Requirements),
+			Offerings:    reduceOfferings(instanceType.Offerings),
+		}
+		strippedTypes = append(strippedTypes, strippedType)
+	}
+
+	return strippedTypes
 }
