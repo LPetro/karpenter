@@ -224,8 +224,8 @@ func InstanceTypeToString(instanceType *cloudprovider.InstanceType) string {
 		return "<nil>"
 	}
 	// TODO: String print the sub-types, like Offerings, too, all of them
-	return fmt.Sprintf("Name: %s,\nRequirements: %s,\n%s", instanceType.Name,
-		RequirementsToString(instanceType.Requirements), OfferingToString(&instanceType.Offerings[0]))
+	return fmt.Sprintf("Name: %s,\nRequirements: %s,\nOffering: %s", instanceType.Name,
+		RequirementsToString(instanceType.Requirements), OfferingsToString(instanceType.Offerings))
 }
 
 func InstanceTypesToString(instanceTypes []*cloudprovider.InstanceType) string {
@@ -258,8 +258,21 @@ func OfferingToString(offering *cloudprovider.Offering) string {
 	if offering == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("{Price: %f, Available: %t}", offering.Price, offering.Available)
+	return fmt.Sprintf("{Requirements: %v, Price: %f, Available: %t}", RequirementsToString(offering.Requirements), offering.Price, offering.Available)
 }
+
+func OfferingsToString(offerings cloudprovider.Offerings) string {
+	if offerings == nil {
+		return "<nil>"
+	}
+	var buf bytes.Buffer
+	for _, offering := range offerings {
+		buf.WriteString(OfferingToString(&offering) + "\n")
+	}
+	return buf.String()
+}
+
+// InstanceTypes
 
 // Resource reducing commands
 
@@ -320,8 +333,9 @@ func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings 
 
 	for _, offering := range offerings {
 		strippedOffering := &cloudprovider.Offering{
-			Price:     offering.Price,
-			Available: offering.Available,
+			Requirements: reduceRequirements(offering.Requirements),
+			Price:        offering.Price,
+			Available:    offering.Available,
 		}
 		strippedOfferings = append(strippedOfferings, *strippedOffering) // TODO am I handling this pointer dereference right?
 	}
@@ -330,6 +344,7 @@ func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings 
 }
 
 // Grab only these key'd values from requirements... karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
+// TODO Should these keys be called more generically? i.e. via v1beta1.CapacityTypeLabelKey, v1.LabelTopologyZone or something?
 func reduceRequirements(requirements scheduling.Requirements) scheduling.Requirements {
 	// Create a new map to store the reduced requirements
 	reducedRequirements := make(scheduling.Requirements)
@@ -352,7 +367,7 @@ func reduceInstanceTypes(types []*cloudprovider.InstanceType) []*cloudprovider.I
 		strippedType := &cloudprovider.InstanceType{
 			Name:         instanceType.Name,
 			Requirements: reduceRequirements(instanceType.Requirements),
-			Offerings:    reduceOfferings(instanceType.Offerings),
+			Offerings:    reduceOfferings(instanceType.Offerings.Available()),
 		}
 		strippedTypes = append(strippedTypes, strippedType)
 	}
