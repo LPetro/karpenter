@@ -284,22 +284,31 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	var strippedNodes []*state.StateNode
 
 	for _, node := range nodes {
-		strippedNode := &state.StateNode{
-			Node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: node.Node.Name,
-				},
-				Status: node.Node.Status,
-			},
-			NodeClaim: &v1beta1.NodeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: node.NodeClaim.Name,
-				},
-			},
-		}
-		strippedNodes = append(strippedNodes, strippedNode)
-	}
+		if node != nil {
+			strippedNode := &state.StateNode{}
 
+			if node.Node != nil {
+				strippedNode.Node = &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: node.Node.Name,
+					},
+					Status: node.Node.Status,
+				}
+			}
+
+			if node.NodeClaim != nil {
+				strippedNode.NodeClaim = &v1beta1.NodeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: node.NodeClaim.Name,
+					},
+				}
+			}
+
+			if strippedNode.Node != nil || strippedNode.NodeClaim != nil {
+				strippedNodes = append(strippedNodes, strippedNode)
+			}
+		}
+	}
 	return strippedNodes
 }
 
