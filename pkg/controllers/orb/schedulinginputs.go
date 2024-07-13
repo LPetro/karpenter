@@ -42,7 +42,7 @@ type SchedulingInput struct {
 }
 
 func (si SchedulingInput) String() string {
-	return fmt.Sprintf("Timestamp: %v\nPendingPods:\n%vStateNodes:\n%vInstanceTypes:\n%v",
+	return fmt.Sprintf("Scheduled at Time (UTC): %v\n\nPendingPods:\n\n%vStateNodes:\n\n%vInstanceTypes:\n\n%v",
 		si.Timestamp.Format("2006-01-02_15-04-05"),
 		PodsToString(si.PendingPods),
 		StateNodesToString(si.StateNodes),
@@ -214,7 +214,7 @@ func InstanceTypeToString(instanceType *cloudprovider.InstanceType) string {
 	}
 	// TODO: String print the sub-types, like Offerings, too, all of them
 	return fmt.Sprintf("Name: %s,\nRequirements: %s,\nOfferings: %s", instanceType.Name,
-		RequirementsToString(&instanceType.Requirements), OfferingToString(&instanceType.Offerings[0]))
+		RequirementsToString(instanceType.Requirements), OfferingToString(&instanceType.Offerings[0]))
 }
 
 func InstanceTypesToString(instanceTypes []*cloudprovider.InstanceType) string {
@@ -229,11 +229,14 @@ func InstanceTypesToString(instanceTypes []*cloudprovider.InstanceType) string {
 }
 
 // Similar for IT Requirements
-func RequirementsToString(requirements *scheduling.Requirements) string {
+// karpenter.sh/capacity-type In [on-demand spot]
+// topology.k8s.aws/zone-id In [usw2-az1 usw2-az2 usw2-az3],
+// topology.kubernetes.io/zone In [us-west-2a us-west-2b us-west-2c]
+func RequirementsToString(requirements scheduling.Requirements) string {
 	if requirements == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Requirements: %s", requirements)
+	return fmt.Sprintf("Requirements: %s, %s, %s", requirements.Get("karpenter.sh/capacity-type"), requirements.Get("topology.k8s.aws/zone-id"), requirements.Get("topology.kubernetes.io/zone"))
 }
 
 // Similar for IT Offerings (Price, Availability)
