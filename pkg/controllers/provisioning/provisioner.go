@@ -314,7 +314,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 	}
 
 	fmt.Println("SI Logging from the Provisioner")
-	orb.LogSchedulingAction(orb.WithProvisioningMetadata(ctx, "normal-provisioning", time.Now())) // Warning: TODO Time should be consistent with Log call below.
+	orb.LogSchedulingAction(ctx, time.Now()) // Warning: TODO Time should be consistent with Log call below.
 	p.SIheap.LogProvisioningScheduler(pods, stateNodes, instanceTypes)
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil

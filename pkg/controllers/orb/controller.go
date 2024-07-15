@@ -60,7 +60,6 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	fmt.Println("----------  Starting a Reconcile Print from ORB  ----------")
 
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV (also loopback test it)
-	fmt.Println("SIheap length before:", c.SIheap.Len())
 	for c.SIheap.Len() > 0 {
 		item := c.SIheap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
 
@@ -75,8 +74,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// 	fmt.Println("Error reconstructing from PV:", err)
 		// 	return reconcile.Result{}, err
 		// }
-	} // TODO: Figure out if I'm actually popping everything off the heap
-	fmt.Println("SIheap length after:", c.SIheap.Len())
+	}
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
 	fmt.Println()
@@ -138,85 +136,6 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 
 	fmt.Println("Data written to S3 bucket successfully!")
 	return nil
-}
-
-// This function will log scheduling action to PV
-func LogSchedulingAction(ctx context.Context) error {
-	metadata, ok := GetProvisioningMetadata(ctx)
-	if !ok {
-		return fmt.Errorf("error getting scheduling action metadata")
-	}
-
-	switch metadata.Action {
-	case "normal-provisioning", "consolidation-simulation":
-		err := WriteSchedulingActionToPV(metadata)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("invalid scheduling action metadata: %s", metadata.Action)
-	}
-	return nil
-}
-
-func WriteSchedulingActionToPV(metadata SchedulingMetadata) error {
-	timestampStr := metadata.Timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
-	path := filepath.Join("/data", fileName)
-
-	file, err := os.Create(path)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
-
-	_, err = fmt.Fprintln(file, timestampStr+"\t"+metadata.Action)
-	if err != nil {
-		fmt.Println("Error writing data to file:", err)
-		return err
-	}
-
-	fmt.Println("Metadata written to S3 bucket successfully!")
-	return nil
-}
-
-// Reads in and parses all the scheduling metadata from the file in the PV.
-func ReadSchedulingMetadata(timestampStr string) ([]*SchedulingMetadata, error) {
-	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
-	path := filepath.Join("/data", fileName)
-
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var existingmetadata []*SchedulingMetadata
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Split(line, "\t")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid line format: %s", line)
-		}
-
-		timestamp, err := time.Parse("2006-01-02_15-04-05", parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse timestamp: %v", err)
-		}
-
-		existingmetadata = append(existingmetadata, &SchedulingMetadata{
-			Timestamp: timestamp,
-			Action:    parts[0],
-		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return existingmetadata, nil
 }
 
 // This function tests whether we can read from the PV and reconstruct the data

@@ -17,7 +17,12 @@ limitations under the License.
 package orb
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 	//"google.golang.org/protobuf/proto"
 )
@@ -30,22 +35,104 @@ type SchedulingMetadata struct {
 type key int
 
 const (
-	provisioningMetadataKey key = iota
+	schedulingMetadataKey key = iota
 )
 
 // case "normal-provisioning":
 // case "consolidation-simulation":
-// WithProvisioningMetadata returns a new context with the provided provisioning metadata.
-func WithProvisioningMetadata(ctx context.Context, action string, timestamp time.Time) context.Context {
+// WithSchedulingMetadata returns a new context with the provided provisioning metadata.
+func WithSchedulingMetadata(ctx context.Context, action string, timestamp time.Time) context.Context {
 	metadata := SchedulingMetadata{
 		Action:    action,
 		Timestamp: timestamp,
 	}
-	return context.WithValue(ctx, provisioningMetadataKey, metadata)
+	return context.WithValue(ctx, schedulingMetadataKey, metadata)
 }
 
-// GetProvisioningMetadata retrieves the provisioning metadata from the context.
-func GetProvisioningMetadata(ctx context.Context) (SchedulingMetadata, bool) {
-	metadata, ok := ctx.Value(provisioningMetadataKey).(SchedulingMetadata)
+// GetProvisioningMetadata retrieves the scheduling metadata from the context.
+func GetSchedulingMetadata(ctx context.Context) (SchedulingMetadata, bool) {
+	metadata, ok := ctx.Value(schedulingMetadataKey).(SchedulingMetadata)
 	return metadata, ok
+}
+
+// This function will log scheduling action to PV
+func LogSchedulingAction(ctx context.Context, timestamp time.Time) error {
+	metadata, ok := GetSchedulingMetadata(ctx)
+	if !ok { // Provisioning metadata is not set, set it to the default - normal provisioning action
+		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", timestamp)
+	}
+
+	switch metadata.Action { // Regardless of which action, so long as valid, write it.
+	case "normal-provisioning", "single-node-consolidation", "multi-node-consolidation":
+		fmt.Println("Writing scheduling metadata to PV: %s", metadata.Action) //Testing, remove later
+		err := WriteSchedulingMetadataToPV(metadata)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid scheduling action metadata: %s", metadata.Action)
+	}
+	return nil
+
+	// TODO: Once we log it, we need to clear it from the context.
+}
+
+func WriteSchedulingMetadataToPV(metadata SchedulingMetadata) error {
+	timestampStr := metadata.Timestamp.Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
+	path := filepath.Join("/data", fileName)
+
+	file, err := os.Create(path)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return err
+	}
+	defer file.Close()
+
+	_, err = fmt.Fprintln(file, timestampStr+"\t"+metadata.Action)
+	if err != nil {
+		fmt.Println("Error writing data to file:", err)
+		return err
+	}
+
+	fmt.Println("Metadata written to S3 bucket successfully!")
+	return nil
+}
+
+// Reads in and parses all the scheduling metadata from the file in the PV.
+func ReadSchedulingMetadataFromPV(timestampStr string) ([]*SchedulingMetadata, error) {
+	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
+	path := filepath.Join("/data", fileName)
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var existingmetadata []*SchedulingMetadata
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, "\t")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid line format: %s", line)
+		}
+
+		timestamp, err := time.Parse("2006-01-02_15-04-05", parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse timestamp: %v", err)
+		}
+
+		existingmetadata = append(existingmetadata, &SchedulingMetadata{
+			Timestamp: timestamp,
+			Action:    parts[0],
+		})
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return existingmetadata, nil
 }
