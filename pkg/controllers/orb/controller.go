@@ -87,10 +87,12 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	}
 
 	// Pop each scheduling metadata off its heap (oldest first) and batch log to PV.
-	err := WriteSchedulingMetadataHeapToPV(c.schedulingMetadataHeap)
-	if err != nil {
-		fmt.Println("Error writing scheduling metadata to PV:", err)
-		return reconcile.Result{}, err
+	if c.schedulingMetadataHeap.Len() > 0 {
+		err := WriteSchedulingMetadataHeapToPV(c.schedulingMetadataHeap)
+		if err != nil {
+			fmt.Println("Error writing scheduling metadata to PV:", err)
+			return reconcile.Result{}, err
+		}
 	}
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")

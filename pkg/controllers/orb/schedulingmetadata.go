@@ -107,15 +107,14 @@ func GetSchedulingMetadata(ctx context.Context) (SchedulingMetadata, bool) {
 // 	return nil
 // }
 
+// Invariant, only called when len > 0
 func WriteSchedulingMetadataHeapToPV(heap *SchedulingMetadataHeap) error {
-	if heap == nil || len(*heap) == 0 {
-		return fmt.Errorf("heap is nil or empty")
+	if heap == nil || heap.Len() == 0 {
+		return fmt.Errorf("precondition broken, called with invalid heap or empty heap")
 	}
 
-	// Get the oldest and newest timestamps and format them as strings
 	oldestStr := (*heap)[0].Timestamp.Format("2006-01-02_15-04-05")
 	newestStr := (*heap)[len(*heap)-1].Timestamp.Format("2006-01-02_15-04-05")
-
 	fileName := fmt.Sprintf("SchedulingActionMetadata_%s_to_%s.log", oldestStr, newestStr)
 	path := filepath.Join("/data", fileName)
 
