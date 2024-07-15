@@ -64,13 +64,13 @@ func LogSchedulingAction(ctx context.Context, timestamp time.Time) error {
 
 	switch metadata.Action { // Regardless of which action, so long as valid, write it.
 	case "normal-provisioning", "single-node-consolidation", "multi-node-consolidation":
-		fmt.Println("Writing scheduling metadata to PV: %s", metadata.Action) //Testing, remove later
+		fmt.Println("Writing scheduling metadata to PV:", metadata.Action) //Testing, remove later
 		err := WriteSchedulingMetadataToPV(metadata)
 		if err != nil {
 			return err
 		}
 	default:
-		fmt.Println("Invalid scheduling action metadata: %s", metadata.Action) //Testing, remove later
+		fmt.Println("Invalid scheduling action metadata:", metadata.Action) //Testing, remove later
 		return fmt.Errorf("invalid scheduling action metadata: %s", metadata.Action)
 	}
 	return nil
