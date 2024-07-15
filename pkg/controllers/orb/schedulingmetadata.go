@@ -60,6 +60,7 @@ func LogSchedulingAction(ctx context.Context, timestamp time.Time) error {
 	metadata, ok := GetSchedulingMetadata(ctx)
 	if !ok { // Provisioning metadata is not set, set it to the default - normal provisioning action
 		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", timestamp)
+		metadata, _ = GetSchedulingMetadata(ctx) // Get it again to update metadata
 	}
 
 	switch metadata.Action { // Regardless of which action, so long as valid, write it.
