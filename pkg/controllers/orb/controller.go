@@ -39,15 +39,15 @@ import (
 )
 
 type Controller struct {
-	SIheap             *SchedulingInputHeap // Batches logs in a Queue
-	mostRecentFilename string               // The most recently saved filename (for checking for changes)
+	SIheap                    *SchedulingInputHeap // Batches logs in a Queue
+	mostRecentSchedulingInput SchedulingInput      // The most recently saved filename (for checking for changes)
 }
 
 // TODO: add struct elements and their instantiations, when defined
 func NewController(SIheap *SchedulingInputHeap) *Controller {
 	return &Controller{
-		SIheap:             SIheap,
-		mostRecentFilename: "", // Initialize with an empty string
+		SIheap:                    SIheap,
+		mostRecentSchedulingInput: SchedulingInput{},
 		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
 		//      That would have to be a delete/replace since PV files are immutable.
 	}
@@ -104,12 +104,12 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	// 	return err
 	// }
 
-	// Instead of the above, In the interim while I figure out the custom protobuf... Just send string to file
+	// TODO: Instead of the above, In the interim while I figure out the custom protobuf... Just send string to file
 	logdata := item.String()
 
 	// Timestamp the file
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
+	fileName := fmt.Sprintf("SchedulingInput_%s.log", timestampStr)
 
 	path := filepath.Join("/data", fileName) // mountPath = /data by PVC
 
@@ -121,20 +121,14 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	}
 	defer file.Close()
 
-	// // Writes data to the file
-	// _, err = fmt.Fprintln(file, timestampStr)
-	// if err != nil {
-	// 	fmt.Println("Error writing timestamp to file:", err)
-	// 	return err
-	// }
-
+	// // Writes serialized data to the file
 	// _, err = file.Write(logdata)
 	// if err != nil {
 	// 	fmt.Println("Error writing data to file:", err)
 	// 	return err
 	// }
 
-	// Only here while testing string print
+	// TODO: Uncomment above; Testing Version // only here while testing string print
 	_, err = fmt.Fprintln(file, logdata)
 	if err != nil {
 		fmt.Println("Error writing data to file:", err)
@@ -144,6 +138,44 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	fmt.Println("Data written to S3 bucket successfully!")
 	return nil
 }
+
+// This function will log scheduling action to PV
+func LogSchedulingAction(ctx context.Context) error {
+	metadata, ok := GetProvisioningMetadata(ctx)
+	if !ok {
+		return fmt.Errorf("error getting scheduling action metadata")
+	}
+
+	path := filepath.Join("/data", "SchedulingActionMetadata.log")
+
+	// Opens the mounted volume (S3 Bucket) file at that path
+	file, err := os.Create(path)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return err
+	}
+	defer file.Close()
+
+	// Log line will be metadata.action + tab char + metadata.time formated as 2006_01...
+	_, err = fmt.Fprintln(file, metadata.Action+"\t"+metadata.Timestamp.Format("2006-01-02_15-04-05"))
+	if err != nil {
+		fmt.Println("Error writing data to file:", err)
+		return err
+	}
+
+	fmt.Println("Data written to S3 bucket successfully!")
+
+	// Can error check on this, or wrap file write in this, as necessary.
+	// switch metadata {
+	// case "normal-provisioning":
+	// 	// Log normal provisioning
+	// case "consolidation-simulation":
+	// 	// Log consolidation simulation
+	// }
+	return nil
+}
+
+// This function tests whether we can read from the PV and reconstruct the data
 
 /* These will be part of the command-line printing representation... */
 
