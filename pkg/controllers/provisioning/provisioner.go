@@ -313,7 +313,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 		return nil, fmt.Errorf("getting daemon pods, %w", err)
 	}
 
-	// fmt.Println("SI Logging from the Provisioner")
+	fmt.Println("SI Logging from the Provisioner")
 	orb.LogSchedulingAction(orb.WithProvisioningMetadata(ctx, "normal-provisioning", time.Now())) // Warning: TODO Time should be consistent with Log call below.
 	p.SIheap.LogProvisioningScheduler(pods, stateNodes, instanceTypes)
 

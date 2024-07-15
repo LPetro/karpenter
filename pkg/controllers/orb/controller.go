@@ -60,6 +60,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	fmt.Println("----------  Starting a Reconcile Print from ORB  ----------")
 
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV (also loopback test it)
+	fmt.Println("SIheap length before:", c.SIheap.Len())
 	for c.SIheap.Len() > 0 {
 		item := c.SIheap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
 
@@ -75,6 +76,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// 	return reconcile.Result{}, err
 		// }
 	} // TODO: Figure out if I'm actually popping everything off the heap
+	fmt.Println("SIheap length after:", c.SIheap.Len())
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
 	fmt.Println()
