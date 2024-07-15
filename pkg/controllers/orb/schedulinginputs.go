@@ -134,7 +134,6 @@ func diffStateNodes(oldNodes, newNodes []*state.StateNode) []*state.StateNode {
 				oldNodeSet[key] = struct{}{}
 			}
 		}
-		oldNodeSet[node.Node.Name+"/"+node.NodeClaim.Name] = struct{}{}
 	}
 
 	newNodeSet := make(map[string]struct{}, len(newNodes))
@@ -164,9 +163,7 @@ func diffStateNodes(oldNodes, newNodes []*state.StateNode) []*state.StateNode {
 }
 
 func getStateNodeKey(node *state.StateNode) string {
-	if node == nil {
-		return ""
-	} else if node.Node == nil && node.NodeClaim == nil {
+	if node == nil || (node.Node == nil && node.NodeClaim == nil) {
 		return ""
 	} else if node.Node == nil {
 		return node.NodeClaim.Name
