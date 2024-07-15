@@ -69,7 +69,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			continue
 		}
 
-		err := c.SaveToPV(item)
+		err := c.SaveToPV(*diffSchedulingInput)
 		if err != nil {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
