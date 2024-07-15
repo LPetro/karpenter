@@ -209,7 +209,21 @@ func hashStateNodes(nodes []*state.StateNode) string {
 	// Convert the slice to a set to handle order
 	nodeSet := make(map[string]struct{}, len(nodes))
 	for _, node := range nodes {
-		nodeKey := node.Node.Name + "/" + node.NodeClaim.Name
+		var nodeKey string
+		if node != nil {
+			nodeName := ""
+			if node.Node != nil {
+				nodeName = node.Node.Name
+			}
+			nodeClaimName := ""
+			if node.NodeClaim != nil {
+				nodeClaimName = node.NodeClaim.Name
+			}
+			nodeKey = nodeName + "/" + nodeClaimName
+		} else {
+			nodeKey = ""
+		}
+
 		nodeSet[nodeKey] = struct{}{}
 	}
 
