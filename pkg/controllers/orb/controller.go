@@ -64,17 +64,17 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV
 	for c.schedulingInputHeap.Len() > 0 {
 		item := c.schedulingInputHeap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
+		diffScheduledInput := &SchedulingInput{}
 
 		// Check if the item has changed since the last time we saved it to PV
 		if c.mostRecentSchedulingInput != nil { // If this is not the first time
-			diffScheduledInput := item.Diff(c.mostRecentSchedulingInput)
+			diffScheduledInput = item.Diff(c.mostRecentSchedulingInput)
 			if diffScheduledInput == nil { // No change, skip saving to PV
 				continue
 			}
-			item = *diffScheduledInput
 		}
 
-		err := c.SaveToPV(item)
+		err := c.SaveToPV(*diffScheduledInput)
 		if err != nil {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
