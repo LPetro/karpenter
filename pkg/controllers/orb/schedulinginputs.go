@@ -128,23 +128,52 @@ func diffStateNodes(oldNodes, newNodes []*state.StateNode) []*state.StateNode {
 	// Convert the slices to sets for efficient difference calculation
 	oldNodeSet := make(map[string]struct{}, len(oldNodes))
 	for _, node := range oldNodes {
+		if node != nil {
+			key := getStateNodeKey(node)
+			if key != "" {
+				oldNodeSet[key] = struct{}{}
+			}
+		}
 		oldNodeSet[node.Node.Name+"/"+node.NodeClaim.Name] = struct{}{}
 	}
 
 	newNodeSet := make(map[string]struct{}, len(newNodes))
 	for _, node := range newNodes {
-		newNodeSet[node.Node.Name+"/"+node.NodeClaim.Name] = struct{}{}
+		if node != nil {
+			key := getStateNodeKey(node)
+			if key != "" {
+				newNodeSet[key] = struct{}{}
+			}
+		}
 	}
 
 	// Find the differences between the sets
 	diff := make([]*state.StateNode, 0)
 	for _, node := range newNodes {
-		if _, exists := oldNodeSet[node.Node.Name+"/"+node.NodeClaim.Name]; !exists {
-			diff = append(diff, node)
+		if node != nil {
+			key := getStateNodeKey(node)
+			if key != "" {
+				if _, exists := oldNodeSet[key]; !exists {
+					diff = append(diff, node)
+				}
+			}
 		}
 	}
 
 	return diff
+}
+
+func getStateNodeKey(node *state.StateNode) string {
+	if node == nil {
+		return ""
+	} else if node.Node == nil && node.NodeClaim == nil {
+		return ""
+	} else if node.Node == nil {
+		return node.NodeClaim.Name
+	} else if node.NodeClaim == nil {
+		return node.Node.Name
+	}
+	return node.Node.Name + "/" + node.NodeClaim.Name
 }
 
 // This is the diffInstanceTypes function which gets the differences between instance types
