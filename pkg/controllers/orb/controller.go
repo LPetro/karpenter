@@ -40,7 +40,7 @@ import (
 type Controller struct {
 	schedulingInputHeap       *SchedulingInputHeap    // Batches logs of inputs to heap
 	schedulingMetadataHeap    *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
-	mostRecentSchedulingInput SchedulingInput         // The most recently saved filename (for checking for changes)
+	mostRecentSchedulingInput *SchedulingInput        // The most recently saved filename (for checking for changes)
 }
 
 // TODO: add struct elements and their instantiations, when defined
@@ -48,7 +48,7 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 	return &Controller{
 		schedulingInputHeap:       schedulingInputHeap,
 		schedulingMetadataHeap:    schedulingMetadataHeap,
-		mostRecentSchedulingInput: SchedulingInput{},
+		mostRecentSchedulingInput: nil,
 		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
 		//      That would have to be a delete/replace since PV files are immutable.
 	}
@@ -66,17 +66,20 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		item := c.schedulingInputHeap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
 
 		// Check if the item has changed since the last time we saved it to PV
-		diffSchedulingInput := item.Diff(&c.mostRecentSchedulingInput)
-		if diffSchedulingInput == nil { // No change, skip saving to PV
-			continue
+		if c.mostRecentSchedulingInput != nil { // If this is not the first time
+			diffScheduledInput := item.Diff(c.mostRecentSchedulingInput)
+			if diffScheduledInput == nil { // No change, skip saving to PV
+				continue
+			}
+			item = *diffScheduledInput
 		}
 
-		err := c.SaveToPV(*diffSchedulingInput)
+		err := c.SaveToPV(item)
 		if err != nil {
 			fmt.Println("Error saving to PV:", err)
 			return reconcile.Result{}, err
 		}
-		c.mostRecentSchedulingInput = item
+		c.mostRecentSchedulingInput = &item
 
 		// // (also loopback test it)
 		// err = c.testReadPVandReconstruct(item)

@@ -84,8 +84,7 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInput {
 		InstanceTypes: diffInstanceTypes(oldSi.InstanceTypes, si.InstanceTypes),
 	}
 
-	// Test print diff
-	fmt.Println("Diff Scheduling Input is... ", diff.String())
+	fmt.Println("Diff Scheduling Input is... ", diff.String()) // Test print, delete later
 
 	return diff
 }
