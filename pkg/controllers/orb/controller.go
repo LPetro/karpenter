@@ -18,7 +18,6 @@ package orb
 
 import (
 	"bufio"
-	"container/heap"
 	"context"
 	"fmt"
 	"io"
@@ -62,7 +61,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV (also loopback test it)
 	for c.SIheap.Len() > 0 {
-		item := heap.Pop(c.SIheap).(SchedulingInput) // Min heap, so always pops the oldest
+		item := c.SIheap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
 
 		err := c.SaveToPV(item)
 		if err != nil {
@@ -75,7 +74,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// 	fmt.Println("Error reconstructing from PV:", err)
 		// 	return reconcile.Result{}, err
 		// }
-	}
+	} // TODO: Figure out if I'm actually popping everything off the heap
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
 	fmt.Println()
@@ -111,7 +110,7 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInput_%s.log", timestampStr)
 
-	path := filepath.Join("/data", fileName) // mountPath = /data by PVC
+	path := filepath.Join("/data/SchedulingInputs", fileName) // mountPath = /data by PVC
 
 	// Opens the mounted volume (S3 Bucket) file at that path
 	file, err := os.Create(path)
@@ -146,9 +145,23 @@ func LogSchedulingAction(ctx context.Context) error {
 		return fmt.Errorf("error getting scheduling action metadata")
 	}
 
-	path := filepath.Join("/data", "SchedulingActionMetadata.log")
+	switch metadata.Action {
+	case "normal-provisioning", "consolidation-simulation":
+		err := WriteSchedulingActionToPV(metadata)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid scheduling action metadata: %s", metadata.Action)
+	}
+	return nil
+}
 
-	// Opens the mounted volume (S3 Bucket) file at that path
+func WriteSchedulingActionToPV(metadata SchedulingMetadata) error {
+	timestampStr := metadata.Timestamp.Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
+	path := filepath.Join("/data", fileName)
+
 	file, err := os.Create(path)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -156,23 +169,52 @@ func LogSchedulingAction(ctx context.Context) error {
 	}
 	defer file.Close()
 
-	// Log line will be metadata.action + tab char + metadata.time formated as 2006_01...
-	_, err = fmt.Fprintln(file, metadata.Action+"\t"+metadata.Timestamp.Format("2006-01-02_15-04-05"))
+	_, err = fmt.Fprintln(file, timestampStr+"\t"+metadata.Action)
 	if err != nil {
 		fmt.Println("Error writing data to file:", err)
 		return err
 	}
 
-	fmt.Println("Data written to S3 bucket successfully!")
-
-	// Can error check on this, or wrap file write in this, as necessary.
-	// switch metadata {
-	// case "normal-provisioning":
-	// 	// Log normal provisioning
-	// case "consolidation-simulation":
-	// 	// Log consolidation simulation
-	// }
+	fmt.Println("Metadata written to S3 bucket successfully!")
 	return nil
+}
+
+// Reads in and parses all the scheduling metadata from the file in the PV.
+func ReadSchedulingMetadata(timestampStr string) ([]*SchedulingMetadata, error) {
+	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
+	path := filepath.Join("/data/SchedulingActionMetadata", fileName)
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var existingmetadata []*SchedulingMetadata
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, "\t")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid line format: %s", line)
+		}
+
+		timestamp, err := time.Parse("2006-01-02_15-04-05", parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse timestamp: %v", err)
+		}
+
+		existingmetadata = append(existingmetadata, &SchedulingMetadata{
+			Timestamp: timestamp,
+			Action:    parts[0],
+		})
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return existingmetadata, nil
 }
 
 // This function tests whether we can read from the PV and reconstruct the data
@@ -201,7 +243,7 @@ func PrintPodPB(data []byte) {
 
 // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
 // They highly recommend sanitizing inputs before accessing that path.
-func (c *Controller) sanitizePath(path string) string {
+func sanitizePath(path string) string {
 	// Remove any leading or trailing slashes, "../" or "./"...
 	path = strings.TrimPrefix(path, "/")
 	path = strings.TrimSuffix(path, "/")
@@ -213,8 +255,8 @@ func (c *Controller) sanitizePath(path string) string {
 }
 
 // Function to pull from an S3 bucket
-func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
-	sanitizedname := c.sanitizePath(logname)
+func ReadFromPV(logname string) (time.Time, []byte, error) {
+	sanitizedname := sanitizePath(logname)
 	path := filepath.Join("/data", sanitizedname)
 
 	// Open the file for reading
@@ -257,10 +299,10 @@ func (c *Controller) ReadFromPV(logname string) (time.Time, []byte, error) {
 }
 
 // Function for reconstructing inputs
-func (c *Controller) ReconstructSchedulingInput(fileName string) error {
+func ReconstructSchedulingInput(fileName string) error {
 
 	// Read from the PV to check (will be what the ORB tool does from the Command Line)
-	readTimestamp, readdata, err := c.ReadFromPV(fileName)
+	readTimestamp, readdata, err := ReadFromPV(fileName)
 	if err != nil {
 		fmt.Println("Error reading from PV:", err)
 		return err
@@ -277,13 +319,13 @@ func (c *Controller) ReconstructSchedulingInput(fileName string) error {
 	return nil
 }
 
-func (c *Controller) testReadPVandReconstruct(item SchedulingInput) error {
+func testReadPVandReconstruct(item SchedulingInput) error {
 	// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
 	// In reality, we could just pull a file from a known directory
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
 
-	err := c.ReconstructSchedulingInput(fileName)
+	err := ReconstructSchedulingInput(fileName)
 	if err != nil {
 		fmt.Println("Error reconstructing scheduling input:", err)
 		return err
