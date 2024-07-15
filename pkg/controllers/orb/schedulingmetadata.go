@@ -70,6 +70,7 @@ func LogSchedulingAction(ctx context.Context, timestamp time.Time) error {
 			return err
 		}
 	default:
+		fmt.Println("Invalid scheduling action metadata: %s", metadata.Action) //Testing, remove later
 		return fmt.Errorf("invalid scheduling action metadata: %s", metadata.Action)
 	}
 	return nil
