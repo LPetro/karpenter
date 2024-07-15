@@ -110,7 +110,7 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInput_%s.log", timestampStr)
 
-	path := filepath.Join("/data/SchedulingInputs", fileName) // mountPath = /data by PVC
+	path := filepath.Join("/data", fileName) // mountPath = /data by PVC
 
 	// Opens the mounted volume (S3 Bucket) file at that path
 	file, err := os.Create(path)
@@ -182,7 +182,7 @@ func WriteSchedulingActionToPV(metadata SchedulingMetadata) error {
 // Reads in and parses all the scheduling metadata from the file in the PV.
 func ReadSchedulingMetadata(timestampStr string) ([]*SchedulingMetadata, error) {
 	fileName := fmt.Sprintf("SchedulingActionMetadata_%s.log", timestampStr)
-	path := filepath.Join("/data/SchedulingActionMetadata", fileName)
+	path := filepath.Join("/data", fileName)
 
 	file, err := os.Open(path)
 	if err != nil {
