@@ -38,14 +38,16 @@ import (
 )
 
 type Controller struct {
-	SIheap                    *SchedulingInputHeap // Batches logs in a Queue
-	mostRecentSchedulingInput SchedulingInput      // The most recently saved filename (for checking for changes)
+	schedulingInputHeap       *SchedulingInputHeap    // Batches logs of inputs to heap
+	schedulingMetadataHeap    *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
+	mostRecentSchedulingInput SchedulingInput         // The most recently saved filename (for checking for changes)
 }
 
 // TODO: add struct elements and their instantiations, when defined
-func NewController(SIheap *SchedulingInputHeap) *Controller {
+func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataHeap *SchedulingMetadataHeap) *Controller {
 	return &Controller{
-		SIheap:                    SIheap,
+		schedulingInputHeap:       schedulingInputHeap,
+		schedulingMetadataHeap:    schedulingMetadataHeap,
 		mostRecentSchedulingInput: SchedulingInput{},
 		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
 		//      That would have to be a delete/replace since PV files are immutable.
@@ -59,9 +61,9 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	fmt.Println("----------  Starting a Reconcile Print from ORB  ----------")
 
-	// Pop each scheduling input off my heap (oldest first) and batch log in PV (also loopback test it)
-	for c.SIheap.Len() > 0 {
-		item := c.SIheap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
+	// Pop each scheduling input off my heap (oldest first) and batch log in PV
+	for c.schedulingInputHeap.Len() > 0 {
+		item := c.schedulingInputHeap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
 
 		// Check if the item has changed since the last time we saved it to PV
 		diffSchedulingInput := item.Diff(&c.mostRecentSchedulingInput)
@@ -76,11 +78,19 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		}
 		c.mostRecentSchedulingInput = item
 
+		// // (also loopback test it)
 		// err = c.testReadPVandReconstruct(item)
 		// if err != nil {
 		// 	fmt.Println("Error reconstructing from PV:", err)
 		// 	return reconcile.Result{}, err
 		// }
+	}
+
+	// Pop each scheduling metadata off its heap (oldest first) and batch log to PV.
+	err := WriteSchedulingMetadataHeapToPV(c.schedulingMetadataHeap)
+	if err != nil {
+		fmt.Println("Error writing scheduling metadata to PV:", err)
+		return reconcile.Result{}, err
 	}
 
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
