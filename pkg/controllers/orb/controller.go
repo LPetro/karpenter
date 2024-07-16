@@ -63,25 +63,37 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV
 	for c.schedulingInputHeap.Len() > 0 {
-		item := c.schedulingInputHeap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
-		diffScheduledInput := &SchedulingInput{}
+		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput) // Min heap, so always pops the oldest
 
-		// Check if the item has changed since the last time we saved it to PV
-		if c.mostRecentSchedulingInput != nil { // If this is not the first time
-			diffScheduledInput = item.Diff(c.mostRecentSchedulingInput)
-			if diffScheduledInput == nil { // No change, skip saving to PV
-				continue
+		diffScheduledInputAdded := &SchedulingInput{}
+		diffScheduledInputRemoved := &SchedulingInput{}
+
+		// Check if this is the first time we're receiving input, set the "baseline"
+		if c.mostRecentSchedulingInput == nil {
+			err := c.SaveToPV(currentInput, "Baseline")
+			if err != nil {
+				fmt.Println("Error saving to PV:", err)
+				return reconcile.Result{}, err
 			}
-		} else {
-			diffScheduledInput = &item
+		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
+			diffScheduledInputAdded, diffScheduledInputRemoved = currentInput.Diff(c.mostRecentSchedulingInput)
+			if diffScheduledInputAdded != nil {
+				err := c.SaveToPV(*diffScheduledInputAdded, "DiffAdded")
+				if err != nil {
+					fmt.Println("Error saving to PV:", err)
+					return reconcile.Result{}, err
+				}
+			}
+			if diffScheduledInputRemoved != nil {
+				err := c.SaveToPV(*diffScheduledInputRemoved, "DiffRemoved")
+				if err != nil {
+					fmt.Println("Error saving to PV:", err)
+					return reconcile.Result{}, err
+				}
+			}
 		}
 
-		err := c.SaveToPV(*diffScheduledInput)
-		if err != nil {
-			fmt.Println("Error saving to PV:", err)
-			return reconcile.Result{}, err
-		}
-		c.mostRecentSchedulingInput = &item
+		c.mostRecentSchedulingInput = &currentInput
 
 		// // (also loopback test it)
 		// err = c.testReadPVandReconstruct(item)
@@ -115,7 +127,7 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 }
 
 // This function saves things to our Persistent Volume, saving data to PV (S3 Bucket for AWS) via the mounted log path
-func (c *Controller) SaveToPV(item SchedulingInput) error {
+func (c *Controller) SaveToPV(item SchedulingInput, difftype string) error {
 
 	//fmt.Println("Saving Scheduling Input to PV:\n", item.String()) // Test print
 	// logdata, err := item.Marshal()
@@ -128,7 +140,7 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	logdata := item.String()
 
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingInput_%s.log", timestampStr)
+	fileName := fmt.Sprintf("SchedulingInput%s_%s.log", difftype, timestampStr)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
 	// Opens the mounted volume (S3 Bucket) file at that path

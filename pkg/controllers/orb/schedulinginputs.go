@@ -24,6 +24,7 @@ import (
 	"github.com/samber/lo"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/karpenter/pkg/apis/v1beta1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
@@ -65,139 +66,111 @@ func (si SchedulingInput) String() string {
 
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
 // This function takes an old Scheduling Input and a new one and returns a SchedulingInput of only the differences.
-func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInput {
-	pendingPods := diffPods(oldSi.PendingPods, si.PendingPods)
-	stateNodes := diffStateNodes(oldSi.StateNodes, si.StateNodes)
-	instanceTypes := diffInstanceTypes(oldSi.InstanceTypes, si.InstanceTypes)
+func (si *SchedulingInput) Diff(oldSi *SchedulingInput) (*SchedulingInput, *SchedulingInput) {
+	pendingPodsAdded, pendingPodsRemoved := diffPods(oldSi.PendingPods, si.PendingPods)
+	stateNodesAdded, stateNodesRemoved := diffStateNodes(oldSi.StateNodes, si.StateNodes)
+	instanceTypesAdded, instanceTypesRemoved := diffInstanceTypes(oldSi.InstanceTypes, si.InstanceTypes)
 
-	// Check if all three are nil
-	if pendingPods == nil && stateNodes == nil && instanceTypes == nil {
-		return nil
-	}
-
-	diff := &SchedulingInput{
+	diffAdded := &SchedulingInput{
 		Timestamp:     si.Timestamp, // i.e. the time of those (newer) differences
-		PendingPods:   diffPods(oldSi.PendingPods, si.PendingPods),
-		StateNodes:    diffStateNodes(oldSi.StateNodes, si.StateNodes),
-		InstanceTypes: diffInstanceTypes(oldSi.InstanceTypes, si.InstanceTypes),
+		PendingPods:   pendingPodsAdded,
+		StateNodes:    stateNodesAdded,
+		InstanceTypes: instanceTypesAdded,
 	}
 
-	fmt.Println("Diff Scheduling Input is... ", diff.String()) // Test print, delete later
+	diffRemoved := &SchedulingInput{
+		Timestamp:     si.Timestamp, // i.e. the time of those (newer) differences
+		PendingPods:   pendingPodsRemoved,
+		StateNodes:    stateNodesRemoved,
+		InstanceTypes: instanceTypesRemoved,
+	}
 
-	return diff
+	if pendingPodsAdded == nil && stateNodesAdded == nil && instanceTypesAdded == nil {
+		diffAdded = nil
+	} else {
+		fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
+	}
+
+	if pendingPodsRemoved == nil && stateNodesRemoved == nil && instanceTypesRemoved == nil {
+		diffRemoved = nil
+	} else {
+		fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
+	}
+
+	return diffAdded, diffRemoved
 }
 
 // This is the diffPods function which gets the differences between pods
-func diffPods(oldPods, newPods []*v1.Pod) []*v1.Pod {
+func diffPods(oldPods, newPods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
 	// Convert the slices to sets for orderless difference calculation
-	oldPodSet := make(map[string]struct{}, len(oldPods))
+	oldPodSet := sets.New[*v1.Pod](oldPods...)
 	for _, pod := range oldPods {
-		oldPodSet[pod.Namespace+"/"+pod.Name] = struct{}{}
+		oldPodSet.Insert(pod)
 	}
 
-	newPodSet := make(map[string]struct{}, len(newPods))
+	newPodSet := sets.New[*v1.Pod](newPods...)
 	for _, pod := range newPods {
-		newPodSet[pod.Namespace+"/"+pod.Name] = struct{}{}
+		newPodSet.Insert(pod)
 	}
 
 	// If they're equal, return nil, otherwise find the differences.
 	if equality.Semantic.DeepEqual(oldPodSet, newPodSet) {
-		return nil
+		return nil, nil
 	}
 
-	// Find the differences between the sets
-	diff := make([]*v1.Pod, 0)
-	for _, pod := range newPods {
-		if _, exists := oldPodSet[pod.Namespace+"/"+pod.Name]; !exists {
-			diff = append(diff, pod)
-		}
-	}
+	added := newPodSet.Difference(oldPodSet).UnsortedList()
+	removed := oldPodSet.Difference(newPodSet).UnsortedList()
 
-	return diff
+	return added, removed
 }
 
 // This is the diffStateNodes function which gets the differences between statenodes
-func diffStateNodes(oldNodes, newNodes []*state.StateNode) []*state.StateNode {
+func diffStateNodes(oldNodes, newNodes []*state.StateNode) ([]*state.StateNode, []*state.StateNode) {
 	// Convert the slices to sets for orderless difference calculation
-	oldNodeSet := make(map[string]struct{}, len(oldNodes))
+	oldNodeSet := sets.New[*state.StateNode](oldNodes...)
 	for _, node := range oldNodes {
-		if node != nil {
-			key := getStateNodeKey(node)
-			if key != "" {
-				oldNodeSet[key] = struct{}{}
-			}
-		}
+		oldNodeSet.Insert(node)
 	}
 
-	newNodeSet := make(map[string]struct{}, len(newNodes))
+	newNodeSet := sets.New[*state.StateNode](newNodes...)
 	for _, node := range newNodes {
-		if node != nil {
-			key := getStateNodeKey(node)
-			if key != "" {
-				newNodeSet[key] = struct{}{}
-			}
-		}
+		newNodeSet.Insert(node)
 	}
 
 	// If they're equal, return nil, otherwise find the differences.
 	if equality.Semantic.DeepEqual(oldNodeSet, newNodeSet) {
-		return nil
+		return nil, nil
 	}
 
-	// Find the differences between the sets
-	diff := make([]*state.StateNode, 0)
-	for _, node := range newNodes {
-		if node != nil {
-			key := getStateNodeKey(node)
-			if key != "" {
-				if _, exists := oldNodeSet[key]; !exists {
-					diff = append(diff, node)
-				}
-			}
-		}
-	}
+	added := newNodeSet.Difference(oldNodeSet).UnsortedList()
+	removed := oldNodeSet.Difference(newNodeSet).UnsortedList()
 
-	return diff
-}
-
-func getStateNodeKey(node *state.StateNode) string {
-	if node == nil || (node.Node == nil && node.NodeClaim == nil) {
-		return ""
-	} else if node.Node == nil {
-		return node.NodeClaim.Name
-	} else if node.NodeClaim == nil {
-		return node.Node.Name
-	}
-	return node.Node.Name + "/" + node.NodeClaim.Name
+	return added, removed
 }
 
 // This is the diffInstanceTypes function which gets the differences between instance types
-func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
+func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) ([]*cloudprovider.InstanceType, []*cloudprovider.InstanceType) {
 	// Convert the slices to sets for orderless difference calculation
-	oldTypeSet := make(map[string]struct{}, len(oldTypes))
+	oldTypeSet := sets.New[*cloudprovider.InstanceType](oldTypes...)
 	for _, instanceType := range oldTypes {
-		oldTypeSet[instanceType.Name] = struct{}{}
+		oldTypeSet.Insert(instanceType)
 	}
 
-	newTypeSet := make(map[string]struct{}, len(newTypes))
+	newTypeSet := sets.New[*cloudprovider.InstanceType](newTypes...)
 	for _, instanceType := range newTypes {
-		newTypeSet[instanceType.Name] = struct{}{}
+		newTypeSet.Insert(instanceType)
 	}
 
 	// If they're equal, return nil, otherwise find the differences.
 	if equality.Semantic.DeepEqual(oldTypeSet, newTypeSet) {
-		return nil
+		return nil, nil
 	}
 
 	// Find the differences between the sets
-	diff := make([]*cloudprovider.InstanceType, 0)
-	for _, instanceType := range newTypes {
-		if _, exists := oldTypeSet[instanceType.Name]; !exists {
-			diff = append(diff, instanceType)
-		}
-	}
+	added := newTypeSet.Difference(oldTypeSet).UnsortedList()
+	removed := oldTypeSet.Difference(newTypeSet).UnsortedList()
 
-	return diff
+	return added, removed
 }
 
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
