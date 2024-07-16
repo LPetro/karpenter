@@ -75,8 +75,6 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 				fmt.Println("Error saving to PV:", err)
 				return reconcile.Result{}, err
 			}
-			c.mostRecentSchedulingInput = &SchedulingInput{}
-			*c.mostRecentSchedulingInput = currentInput // Copy the current input to the most recent input
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
 			diffScheduledInputAdded, diffScheduledInputRemoved = currentInput.Diff(c.mostRecentSchedulingInput)
 			if diffScheduledInputAdded != nil {
@@ -93,10 +91,9 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 					return reconcile.Result{}, err
 				}
 			}
-			*c.mostRecentSchedulingInput = currentInput // Update the most recent input with the current input
 		}
 
-		// c.mostRecentSchedulingInput = &currentInput
+		c.mostRecentSchedulingInput = &currentInput
 
 		// // (also loopback test it)
 		// err = c.testReadPVandReconstruct(item)
@@ -118,7 +115,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
 	fmt.Println()
 
-	return reconcile.Result{RequeueAfter: time.Second * 30}, nil
+	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 }
 
 // TODO: What does this register function do? Is it needed for a controller to work?
