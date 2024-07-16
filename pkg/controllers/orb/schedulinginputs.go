@@ -261,7 +261,8 @@ func hasPodChanged(oldPod, newPod *v1.Pod) bool {
 }
 
 func hasStateNodeChanged(oldStateNode, newStateNode *state.StateNode) bool {
-	return ReducedStateNodeEquals(oldStateNode, newStateNode)
+	return !equality.Semantic.DeepDerivative(oldStateNode, newStateNode)
+	// return ReducedStateNodeEquals(oldStateNode, newStateNode)
 }
 
 func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
