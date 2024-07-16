@@ -19,7 +19,6 @@ package orb
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -104,27 +103,11 @@ func (si SchedulingInput) Reduce() SchedulingInput {
 // TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
 // which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
 func (si SchedulingInput) String() string {
-	pendingpodsjsonData, err := json.MarshalIndent(si.PendingPods, "", "  ")
-	if err != nil {
-		fmt.Println("Error marshaling Pending Pods to JSON:", err)
-	}
-	stateNodesjsonData, err := json.MarshalIndent(si.StateNodesWithPods, "", "  ")
-	if err != nil {
-		fmt.Println("Error marshaling State Nodes to JSON:", err)
-	}
-	instanceTypesjsonData, err := json.MarshalIndent(si.InstanceTypes, "", "  ")
-	if err != nil {
-		fmt.Println("Error marshaling Instance Types to JSON:", err)
-	}
-
 	return fmt.Sprintf("Scheduled at Time (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nInstanceTypes:\n%v\n\n",
 		si.Timestamp.Format("2006-01-02_15-04-05"),
-		// PodsToString(si.PendingPods),
-		// StateNodesWithPodsToString(si.StateNodesWithPods),
-		// InstanceTypesToString(si.InstanceTypes),
-		string(pendingpodsjsonData),
-		string(stateNodesjsonData),
-		string(instanceTypesjsonData),
+		PodsToString(si.PendingPods),
+		StateNodesWithPodsToString(si.StateNodesWithPods),
+		InstanceTypesToString(si.InstanceTypes),
 	)
 }
 
