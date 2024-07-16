@@ -317,9 +317,9 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 	}
 
 	// fmt.Println("SI Logging from the Provisioner")
-	scheduledTime := time.Now()
-	p.schedulingMetadataHeap.LogSchedulingAction(ctx, scheduledTime)
-	p.schedulingInputHeap.LogProvisioningScheduler(scheduledTime, pods, stateNodes, instanceTypes)
+	schedulingTime := time.Now()
+	p.schedulingMetadataHeap.LogSchedulingAction(ctx, schedulingTime)
+	p.schedulingInputHeap.LogProvisioningScheduler(ctx, p.kubeClient, schedulingTime, pods, stateNodes, instanceTypes)
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
 }
