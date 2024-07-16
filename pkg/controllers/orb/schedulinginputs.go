@@ -150,26 +150,53 @@ func diffStateNodes(oldNodes, newNodes []*state.StateNode) ([]*state.StateNode, 
 
 // This is the diffInstanceTypes function which gets the differences between instance types
 func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) ([]*cloudprovider.InstanceType, []*cloudprovider.InstanceType) {
-	// Convert the slices to sets for orderless difference calculation
-	oldTypeSet := sets.New(oldTypes...)
+	// // Convert the slices to sets for orderless difference calculation
+	// oldTypeSet := sets.New(oldTypes...)
+	// for _, instanceType := range oldTypes {
+	// 	oldTypeSet.Insert(instanceType)
+	// }
+
+	// newTypeSet := sets.New(newTypes...)
+	// for _, instanceType := range newTypes {
+	// 	newTypeSet.Insert(instanceType)
+	// }
+
+	// // If they're equal, return nil, otherwise find the differences.
+	// if equality.Semantic.DeepEqual(oldTypeSet, newTypeSet) {
+	// 	fmt.Println("Instance types are equal, testing Equal too: ", oldTypeSet.Equal(newTypeSet))
+	// 	return nil, nil
+	// }
+
+	// // Find the differences between the sets
+	// added := newTypeSet.Difference(oldTypeSet).UnsortedList()
+	// removed := oldTypeSet.Difference(newTypeSet).UnsortedList()
+
+	// Convert the slices to sets for efficient difference calculation
+	oldTypeSet := make(map[string]struct{}, len(oldTypes))
 	for _, instanceType := range oldTypes {
-		oldTypeSet.Insert(instanceType)
+		oldTypeSet[instanceType.Name] = struct{}{}
 	}
 
-	newTypeSet := sets.New(newTypes...)
+	newTypeSet := make(map[string]struct{}, len(newTypes))
 	for _, instanceType := range newTypes {
-		newTypeSet.Insert(instanceType)
-	}
-
-	// If they're equal, return nil, otherwise find the differences.
-	if equality.Semantic.DeepEqual(oldTypeSet, newTypeSet) {
-		fmt.Println("Instance types are equal, testing Equal too: ", oldTypeSet.Equal(newTypeSet))
-		return nil, nil
+		newTypeSet[instanceType.Name] = struct{}{}
 	}
 
 	// Find the differences between the sets
-	added := newTypeSet.Difference(oldTypeSet).UnsortedList()
-	removed := oldTypeSet.Difference(newTypeSet).UnsortedList()
+	added := make([]*cloudprovider.InstanceType, 0)
+	for _, instanceType := range newTypes {
+		if _, exists := oldTypeSet[instanceType.Name]; !exists {
+			added = append(added, instanceType)
+		}
+	}
+
+	removed := make([]*cloudprovider.InstanceType, 0)
+	// removed := make([]*cloudprovider.InstanceType, 0)
+	for _, instanceType := range oldTypes {
+		if _, exists := newTypeSet[instanceType.Name]; !exists {
+			removed = append(removed, instanceType)
+		}
+	}
 
 	return added, removed
 }
