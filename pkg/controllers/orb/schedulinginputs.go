@@ -103,7 +103,7 @@ func (si SchedulingInput) Reduce() SchedulingInput {
 // TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
 // which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
 func (si SchedulingInput) String() string {
-	return fmt.Sprintf("Scheduled at Time (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nInstanceTypes:\n%v\n\n",
+	return fmt.Sprintf("Timestamp (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nInstanceTypes:\n%v\n\n",
 		si.Timestamp.Format("2006-01-02_15-04-05"),
 		PodsToString(si.PendingPods),
 		StateNodesWithPodsToString(si.StateNodesWithPods),

@@ -38,17 +38,17 @@ import (
 )
 
 type Controller struct {
-	schedulingInputHeap       *SchedulingInputHeap    // Batches logs of inputs to heap
-	schedulingMetadataHeap    *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
-	mostRecentSchedulingInput *SchedulingInput        // The most recently saved filename (for checking for changes)
+	schedulingInputHeap     *SchedulingInputHeap    // Batches logs of inputs to heap
+	schedulingMetadataHeap  *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
+	baselineSchedulingInput *SchedulingInput        // The most recently saved filename (for checking for changes)
 }
 
 // TODO: add struct elements and their instantiations, when defined
 func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataHeap *SchedulingMetadataHeap) *Controller {
 	return &Controller{
-		schedulingInputHeap:       schedulingInputHeap,
-		schedulingMetadataHeap:    schedulingMetadataHeap,
-		mostRecentSchedulingInput: nil,
+		schedulingInputHeap:     schedulingInputHeap,
+		schedulingMetadataHeap:  schedulingMetadataHeap,
+		baselineSchedulingInput: nil,
 		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
 		//      That would have to be a delete/replace since PV files are immutable.
 	}
@@ -70,14 +70,15 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		inputDiffChanged := &SchedulingInput{}
 
 		// Check if this is the first time we're receiving input, set the "baseline"
-		if c.mostRecentSchedulingInput == nil {
+		if c.baselineSchedulingInput == nil {
 			err := c.SaveToPV(currentInput, "Baseline")
 			if err != nil {
 				fmt.Println("Error saving to PV:", err)
 				return reconcile.Result{}, err
 			}
+			c.baselineSchedulingInput = &currentInput
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
-			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentSchedulingInput)
+			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.baselineSchedulingInput)
 			if inputDiffAdded == nil && inputDiffRemoved == nil {
 				fmt.Println("No changes to scheduling inputs since last save.")
 				continue
@@ -104,8 +105,6 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 				}
 			}
 		}
-
-		c.mostRecentSchedulingInput = &currentInput
 
 		// // (also loopback test it)
 		// err = c.testReadPVandReconstruct(item)
@@ -152,7 +151,7 @@ func (c *Controller) SaveToPV(item SchedulingInput, difftype string) error {
 	logdata := item.String()
 
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingInput_%s_%s.log", timestampStr, difftype)
+	fileName := fmt.Sprintf("SchedulingInput_%s_%s.log", difftype, timestampStr)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
 	// Opens the mounted volume (S3 Bucket) file at that path
@@ -177,7 +176,7 @@ func (c *Controller) SaveToPV(item SchedulingInput, difftype string) error {
 		return err
 	}
 
-	fmt.Println("Data written to S3 bucket successfully!")
+	fmt.Printf("%s data written to S3 bucket successfully!\n", difftype)
 	return nil
 }
 
