@@ -72,6 +72,13 @@ func getStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 	return stateNodesWithPods
 }
 
+func (snp StateNodeWithPods) GetName() string {
+	if snp.Node == nil {
+		return snp.NodeClaim.GetName()
+	}
+	return snp.Node.GetName()
+}
+
 // Function to create a new SchedulingInput
 
 func (si SchedulingInput) Reduce() SchedulingInput {
@@ -200,12 +207,12 @@ func diffStateNodes(oldStateNodesWithPods, newStateNodesWithPods []*StateNodeWit
 	// Convert the slices to sets for efficient difference calculation
 	oldStateNodeSet := make(map[string]*StateNodeWithPods, len(oldStateNodesWithPods))
 	for _, stateNodeWithPods := range oldStateNodesWithPods {
-		oldStateNodeSet[stateNodeWithPods.Node.GetName()] = stateNodeWithPods
+		oldStateNodeSet[stateNodeWithPods.GetName()] = stateNodeWithPods
 	}
 
 	newStateNodeSet := make(map[string]*StateNodeWithPods, len(newStateNodesWithPods))
 	for _, stateNodeWithPods := range newStateNodesWithPods {
-		newStateNodeSet[stateNodeWithPods.Node.GetName()] = stateNodeWithPods
+		newStateNodeSet[stateNodeWithPods.GetName()] = stateNodeWithPods
 	}
 
 	// Find the differences between the sets
@@ -213,7 +220,7 @@ func diffStateNodes(oldStateNodesWithPods, newStateNodesWithPods []*StateNodeWit
 	removed := []*StateNodeWithPods{}
 	changed := []*StateNodeWithPods{}
 	for _, newStateNodeWithPods := range newStateNodesWithPods {
-		oldStateNodeWithPods, exists := oldStateNodeSet[newStateNodeWithPods.Node.GetName()]
+		oldStateNodeWithPods, exists := oldStateNodeSet[newStateNodeWithPods.GetName()]
 
 		// If stateNode is new, add to "added"
 		if !exists {
@@ -229,7 +236,7 @@ func diffStateNodes(oldStateNodesWithPods, newStateNodesWithPods []*StateNodeWit
 
 	// Get the remainder "removed" stateNodesWithPods
 	for _, oldStateNodeWithPods := range oldStateNodesWithPods {
-		if _, exists := newStateNodeSet[oldStateNodeWithPods.Node.GetName()]; !exists {
+		if _, exists := newStateNodeSet[oldStateNodeWithPods.GetName()]; !exists {
 			removed = append(removed, oldStateNodeWithPods)
 		}
 	}
