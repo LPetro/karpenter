@@ -139,19 +139,19 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) (*SchedulingInput, *Sche
 		InstanceTypes:      instanceTypesChanged,
 	}
 
-	if pendingPodsAdded == nil && stateNodesAdded == nil && instanceTypesAdded == nil {
+	if len(pendingPodsAdded)+len(stateNodesAdded)+len(instanceTypesAdded) == 0 {
 		diffAdded = nil
 	} else {
 		fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
 	}
 
-	if pendingPodsRemoved == nil && stateNodesRemoved == nil && instanceTypesRemoved == nil {
+	if len(pendingPodsRemoved)+len(stateNodesRemoved)+len(instanceTypesRemoved) == 0 {
 		diffRemoved = nil
 	} else {
 		fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
 	}
 
-	if pendingPodsChanged == nil && stateNodesChanged == nil && instanceTypesChanged == nil {
+	if len(pendingPodsChanged)+len(stateNodesChanged)+len(instanceTypesChanged) == 0 {
 		diffChanged = nil
 	} else {
 		fmt.Println("Diff Scheduling Input changed is... ", diffChanged.String()) // Test print, delete later
@@ -174,9 +174,9 @@ func diffPods(oldPods, newPods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
 	}
 
 	// Find the differences between the sets
-	added := make([]*v1.Pod, 0)
-	removed := make([]*v1.Pod, 0)
-	changed := make([]*v1.Pod, 0)
+	added := []*v1.Pod{}
+	removed := []*v1.Pod{}
+	changed := []*v1.Pod{}
 	for _, newPod := range newPods {
 		oldPod, exists := oldPodSet[newPod.GetName()]
 
