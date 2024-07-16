@@ -114,10 +114,7 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 		Complete(singleton.AsReconciler(c))
 }
 
-/* This function saves things to our Persistent Volume */
-// Saves data to PV (S3 Bucket for AWS) via the mounted log path
-// It takes a name of the log file as well as the logline to be logged.
-// The function opens a file for writing, writes some data to the file, and then closes the file
+// This function saves things to our Persistent Volume, saving data to PV (S3 Bucket for AWS) via the mounted log path
 func (c *Controller) SaveToPV(item SchedulingInput) error {
 
 	//fmt.Println("Saving Scheduling Input to PV:\n", item.String()) // Test print
@@ -130,11 +127,9 @@ func (c *Controller) SaveToPV(item SchedulingInput) error {
 	// TODO: Instead of the above, In the interim while I figure out the custom protobuf... Just send string to file
 	logdata := item.String()
 
-	// Timestamp the file
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInput_%s.log", timestampStr)
-
-	path := filepath.Join("/data", fileName) // mountPath = /data by PVC
+	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
 	// Opens the mounted volume (S3 Bucket) file at that path
 	file, err := os.Create(path)
