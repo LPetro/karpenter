@@ -52,6 +52,16 @@ func (si SchedulingInput) Reduce() SchedulingInput {
 	}
 }
 
+// Function does equality for a "reduced" StateNode.
+// A reduced StateNode is equal iff their Node and the Nodeclaim and both internally DeepEqual)
+// Implemented because DeepEqual on StateNode caused "panic: an unexported field was encountered"
+func ReducedStateNodeEquals(oldStateNode *state.StateNode, newStateNode *state.StateNode) bool {
+	return equality.Semantic.DeepEqual(oldStateNode.Node, newStateNode.Node) &&
+		equality.Semantic.DeepEqual(oldStateNode.NodeClaim, newStateNode.NodeClaim)
+}
+
+// Function does equality for a "reduced" Pod (i.e. equal if the Pod and the Node it's scheduled on are internally DeepEqual)
+
 // TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
 // which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
 func (si SchedulingInput) String() string {
@@ -139,7 +149,7 @@ func diffPods(oldPods, newPods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
 		}
 
 		// If pod has changed, add the whole changed pod
-		if !equality.Semantic.DeepEqual(oldPod, newPod) {
+		if hasPodChanged(oldPod, newPod) {
 			changed = append(changed, newPod)
 		}
 	}
@@ -251,7 +261,7 @@ func hasPodChanged(oldPod, newPod *v1.Pod) bool {
 }
 
 func hasStateNodeChanged(oldStateNode, newStateNode *state.StateNode) bool {
-	return !equality.Semantic.DeepEqual(oldStateNode, newStateNode)
+	return ReducedStateNodeEquals(oldStateNode, newStateNode)
 }
 
 func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
