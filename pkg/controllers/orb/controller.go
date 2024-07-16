@@ -77,6 +77,10 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			}
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
 			diffScheduledInputAdded, diffScheduledInputRemoved = currentInput.Diff(c.mostRecentSchedulingInput)
+			if diffScheduledInputAdded == nil && diffScheduledInputRemoved == nil {
+				fmt.Println("No changes to scheduling inputs since last save.")
+				continue
+			}
 			if diffScheduledInputAdded != nil {
 				err := c.SaveToPV(*diffScheduledInputAdded, "DiffAdded")
 				if err != nil {
@@ -140,7 +144,7 @@ func (c *Controller) SaveToPV(item SchedulingInput, difftype string) error {
 	logdata := item.String()
 
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingInput%s_%s.log", difftype, timestampStr)
+	fileName := fmt.Sprintf("SchedulingInput_%s_%s.log", timestampStr, difftype)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
 	// Opens the mounted volume (S3 Bucket) file at that path

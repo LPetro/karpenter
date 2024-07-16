@@ -103,12 +103,12 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) (*SchedulingInput, *Sche
 // This is the diffPods function which gets the differences between pods
 func diffPods(oldPods, newPods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
 	// Convert the slices to sets for orderless difference calculation
-	oldPodSet := sets.New[*v1.Pod](oldPods...)
+	oldPodSet := sets.New(oldPods...)
 	for _, pod := range oldPods {
 		oldPodSet.Insert(pod)
 	}
 
-	newPodSet := sets.New[*v1.Pod](newPods...)
+	newPodSet := sets.New(newPods...)
 	for _, pod := range newPods {
 		newPodSet.Insert(pod)
 	}
@@ -127,12 +127,12 @@ func diffPods(oldPods, newPods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
 // This is the diffStateNodes function which gets the differences between statenodes
 func diffStateNodes(oldNodes, newNodes []*state.StateNode) ([]*state.StateNode, []*state.StateNode) {
 	// Convert the slices to sets for orderless difference calculation
-	oldNodeSet := sets.New[*state.StateNode](oldNodes...)
+	oldNodeSet := sets.New(oldNodes...)
 	for _, node := range oldNodes {
 		oldNodeSet.Insert(node)
 	}
 
-	newNodeSet := sets.New[*state.StateNode](newNodes...)
+	newNodeSet := sets.New(newNodes...)
 	for _, node := range newNodes {
 		newNodeSet.Insert(node)
 	}
@@ -151,18 +151,19 @@ func diffStateNodes(oldNodes, newNodes []*state.StateNode) ([]*state.StateNode, 
 // This is the diffInstanceTypes function which gets the differences between instance types
 func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) ([]*cloudprovider.InstanceType, []*cloudprovider.InstanceType) {
 	// Convert the slices to sets for orderless difference calculation
-	oldTypeSet := sets.New[*cloudprovider.InstanceType](oldTypes...)
+	oldTypeSet := sets.New(oldTypes...)
 	for _, instanceType := range oldTypes {
 		oldTypeSet.Insert(instanceType)
 	}
 
-	newTypeSet := sets.New[*cloudprovider.InstanceType](newTypes...)
+	newTypeSet := sets.New(newTypes...)
 	for _, instanceType := range newTypes {
 		newTypeSet.Insert(instanceType)
 	}
 
 	// If they're equal, return nil, otherwise find the differences.
 	if equality.Semantic.DeepEqual(oldTypeSet, newTypeSet) {
+		fmt.Println("Instance types are equal, testing Equal too: ", oldTypeSet.Equal(newTypeSet))
 		return nil, nil
 	}
 
