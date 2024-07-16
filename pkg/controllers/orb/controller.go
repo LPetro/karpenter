@@ -72,6 +72,8 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			if diffScheduledInput == nil { // No change, skip saving to PV
 				continue
 			}
+		} else {
+			diffScheduledInput = &item
 		}
 
 		err := c.SaveToPV(*diffScheduledInput)
