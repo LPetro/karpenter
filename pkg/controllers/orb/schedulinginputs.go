@@ -303,9 +303,10 @@ func hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods *Sta
 
 // Checking Equality on Fields I've reduced by (i.e. Name Requirements Offerings)
 func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
-	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name) ||
-		!equality.Semantic.DeepEqual(oldInstanceType.Offerings, newInstanceType.Offerings) ||
-		!equality.Semantic.DeepEqual(oldInstanceType.Requirements, newInstanceType.Requirements)
+	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name)
+	// || TODO FIX
+	// 	!equality.Semantic.DeepEqual(oldInstanceType.Offerings, newInstanceType.Offerings) ||
+	// 	!equality.Semantic.DeepEqual(oldInstanceType.Requirements, newInstanceType.Requirements)
 }
 
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
