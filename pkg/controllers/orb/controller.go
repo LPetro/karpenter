@@ -59,7 +59,7 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	// ctx = injection.WithControllerName(ctx, "orb.batcher")
 
-	fmt.Println("----------  Starting a Reconcile Print from ORB  ----------")
+	fmt.Println("----------  Starting an ORB Reconcile Cycle  ----------")
 
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV
 	for c.schedulingInputHeap.Len() > 0 {
@@ -123,7 +123,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		}
 	}
 
-	fmt.Println("----------- Ending a Reconcile Print from ORB -----------")
+	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
 	fmt.Println()
 
 	return reconcile.Result{RequeueAfter: time.Second * 30}, nil
