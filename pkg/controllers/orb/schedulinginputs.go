@@ -19,6 +19,7 @@ package orb
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -303,15 +304,21 @@ func hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods *Sta
 func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
 	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name) ||
 		!equality.Semantic.DeepEqual(oldInstanceType.Offerings, newInstanceType.Offerings) ||
-		!requirementsEqual(oldInstanceType.Requirements, newInstanceType.Requirements)
+		!structEqual(oldInstanceType.Requirements, newInstanceType.Requirements)
 }
 
-// Equality test for requirements based on the three keys I'm tracking for them, namely
-// karpenter.sh/capacity-type, topology.k8s.aws/zone-id, topology.kubernetes.io/zone and their values
-func requirementsEqual(oldrequirements scheduling.Requirements, newrequirements scheduling.Requirements) bool {
-	return oldrequirements.Get("karpenter.sh/capacity-type") != newrequirements.Get("karpenter.sh/capacity-type") ||
-		oldrequirements.Get("topology.k8s.aws/zone-id") != newrequirements.Get("topology.k8s.aws/zone-id") ||
-		oldrequirements.Get("topology.kubernetes.io/zone") != newrequirements.Get("topology.kubernetes.io/zone")
+// // Equality test for requirements based on the three keys I'm tracking for them, namely
+// // karpenter.sh/capacity-type, topology.k8s.aws/zone-id, topology.kubernetes.io/zone and their values
+// func requirementsEqual(oldrequirements scheduling.Requirements, newrequirements scheduling.Requirements) bool {
+// 	return oldrequirements.Get("karpenter.sh/capacity-type") != newrequirements.Get("karpenter.sh/capacity-type") ||
+// 		oldrequirements.Get("topology.k8s.aws/zone-id") != newrequirements.Get("topology.k8s.aws/zone-id") ||
+// 		oldrequirements.Get("topology.kubernetes.io/zone") != newrequirements.Get("topology.kubernetes.io/zone")
+// }
+
+func structEqual(a, b interface{}) bool {
+	aBytes, _ := json.Marshal(a)
+	bBytes, _ := json.Marshal(b)
+	return bytes.Equal(aBytes, bBytes)
 }
 
 /* The following functions are testing toString functions that will mirror what the serialization
