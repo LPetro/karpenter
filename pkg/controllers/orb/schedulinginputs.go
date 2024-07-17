@@ -441,10 +441,10 @@ func OfferingsToString(offerings cloudprovider.Offerings) string {
 
 // Reduces a Pod to only the constituent parts we care about (i.e. Name, Namespace and Phase)
 func reducePods(pods []*v1.Pod) []*v1.Pod {
-	var strippedPods []*v1.Pod
+	var reducedPods []*v1.Pod
 
 	for _, pod := range pods {
-		strippedPod := &v1.Pod{
+		reducedPod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
@@ -453,10 +453,10 @@ func reducePods(pods []*v1.Pod) []*v1.Pod {
 				Phase: pod.Status.Phase,
 			},
 		}
-		strippedPods = append(strippedPods, strippedPod)
+		reducedPods = append(reducedPods, reducedPod)
 	}
 
-	return strippedPods
+	return reducedPods
 }
 
 func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
@@ -549,35 +549,38 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 	return proto.Marshal(preMarshalSI)
 }
 
-// Function to get pending pods proto data
-func getPodsData(pods []*v1.Pod) [][]byte {
-	podData := make([][]byte, 0, len(pods))
+func getPodsData(pods []*v1.Pod) []*pb.ReducedPod {
+	reducedPods := []*pb.ReducedPod{}
 
 	for _, pod := range pods {
-		podDataBytes, err := proto.Marshal(pod)
-		if err != nil {
-			fmt.Println("Error marshaling pod:", err) // Remove later, handle error better?
-			continue
+		reducedPod := &pb.ReducedPod{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Phase:     string(pod.Status.Phase),
 		}
-		podData = append(podData, podDataBytes)
+		reducedPods = append(reducedPods, reducedPod)
 	}
 
-	return podData
+	return reducedPods
 }
 
-// Function to get node proto data
-func getNodeData(node *v1.Node) []byte {
+func getNodeData(node *v1.Node) *pb.StateNodeWithPods_ReducedNode {
 	if node == nil {
 		return nil
 	}
 
-	nodeData, err := proto.Marshal(node)
+	nodeStatus, err := node.Status.Marshal()
 	if err != nil {
-		fmt.Println("Error marshaling node:", err)
 		return nil
 	}
 
-	return nodeData
+	// Create a new instance of the reduced node type
+	reducedNode := &pb.StateNodeWithPods_ReducedNode{
+		Name:       node.Name,
+		Nodestatus: nodeStatus,
+	}
+
+	return reducedNode
 }
 
 func getStateNodeWithPodsData(stateNodeWithPods []*StateNodeWithPods) []*pb.StateNodeWithPods {
