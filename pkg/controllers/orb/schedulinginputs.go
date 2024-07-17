@@ -304,7 +304,7 @@ func hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods *Sta
 // Checking equality on only fields I've reduced it to (i.e. Name Requirements Offerings)
 func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
 	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name) ||
-		!equality.Semantic.DeepEqual(oldInstanceType.Offerings, newInstanceType.Offerings) ||
+		!structEqual(oldInstanceType.Offerings, newInstanceType.Offerings) ||
 		!structEqual(oldInstanceType.Requirements, newInstanceType.Requirements)
 }
 
