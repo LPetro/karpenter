@@ -569,15 +569,15 @@ func getNodeData(node *v1.Node) *pb.StateNodeWithPods_ReducedNode {
 		return nil
 	}
 
-	nodeStatus, err := node.Status.Marshal()
-	if err != nil {
-		return nil
-	}
+	// nodeStatus, err := node.Status.Marshal()
+	// if err != nil {
+	// 	return nil
+	// }
 
 	// Create a new instance of the reduced node type
 	reducedNode := &pb.StateNodeWithPods_ReducedNode{
 		Name:       node.Name,
-		Nodestatus: nodeStatus,
+		Nodestatus: nil,
 	}
 
 	return reducedNode
