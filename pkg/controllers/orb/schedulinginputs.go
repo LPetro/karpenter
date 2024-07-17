@@ -580,12 +580,17 @@ func getStateNodeWithPodsData(stateNodeWithPods []*StateNodeWithPods) []*pb.Stat
 	snpData := []*pb.StateNodeWithPods{}
 
 	for _, snp := range stateNodeWithPods {
-		snpData = append(snpData, &pb.StateNodeWithPods{
-			Node: getNodeData(snp.Node),
-			NodeClaim: &pb.StateNodeWithPods_ReducedNodeClaim{
+		var nodeClaim *pb.StateNodeWithPods_ReducedNodeClaim
+		if snp.NodeClaim != nil {
+			nodeClaim = &pb.StateNodeWithPods_ReducedNodeClaim{
 				Name: snp.NodeClaim.GetName(),
-			},
-			Pods: getPodsData(snp.Pods),
+			}
+		}
+
+		snpData = append(snpData, &pb.StateNodeWithPods{
+			Node:      getNodeData(snp.Node),
+			NodeClaim: nodeClaim,
+			Pods:      getPodsData(snp.Pods),
 		})
 	}
 
