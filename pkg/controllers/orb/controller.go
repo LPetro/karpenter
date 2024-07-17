@@ -150,7 +150,7 @@ func (c *Controller) SaveToPV(item SchedulingInput, difftype string) error {
 	// TODO: Instead of the above, In the interim while I figure out the custom protobuf... Just send string to file
 	logdata := item.String()
 
-	timestampStr := item.Timestamp.Format("2006-01-02T15:04:05.000Z")
+	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05Z")
 	fileName := fmt.Sprintf("SchedulingInput_%s_%s.log", difftype, timestampStr)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
@@ -252,7 +252,7 @@ func ReadFromPV(logname string) (time.Time, []byte, error) {
 		return time.Time{}, nil, err
 	}
 
-	timestamp, err := time.Parse("2006-01-02T15:04:05.000Z", timestampStr)
+	timestamp, err := time.Parse("2006-01-02_15-04-05", timestampStr)
 	if err != nil {
 		fmt.Println("Error parsing timestamp:", err)
 		return time.Time{}, nil, err
@@ -285,7 +285,7 @@ func ReadFromPV(logname string) (time.Time, []byte, error) {
 // func testReadPVandReconstruct(item SchedulingInput) error {
 // 	// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
 // 	// In reality, we could just pull a file from a known directory
-// 	timestampStr := item.Timestamp.Format("2006-01-02T15:04:05.000Z")
+// 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 // 	fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
 
 // 	err := ReconstructSchedulingInput(fileName)

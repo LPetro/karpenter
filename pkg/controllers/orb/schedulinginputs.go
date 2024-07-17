@@ -106,7 +106,7 @@ func (si SchedulingInput) Reduce() SchedulingInput {
 // which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
 func (si SchedulingInput) String() string {
 	return fmt.Sprintf("Timestamp (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nInstanceTypes:\n%v\n\n",
-		si.Timestamp.Format("2006-01-02T15:04:05.000Z"),
+		si.Timestamp.Format("2006-01-02_15-04-05"),
 		PodsToString(si.PendingPods),
 		StateNodesWithPodsToString(si.StateNodesWithPods),
 		InstanceTypesToString(si.InstanceTypes),
@@ -564,7 +564,7 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 
 	// // Create an ORBLogEntry message
 	// entry := &ORBLogEntry{
-	// 	Timestamp:      si.Timestamp.Format("2006-01-02T15:04:05.000Z"),
+	// 	Timestamp:      si.Timestamp.Format("2006-01-02_15-04-05"),
 	// 	PendingpodData: podDataSlice,
 	// }
 
@@ -579,7 +579,7 @@ func (si SchedulingInput) Marshal() ([]byte, error) {
 // 	}
 
 // 	// Parse the timestamp
-// 	timestamp, err := time.Parse("2006-01-02T15:04:05.000Z", entry.Timestamp)
+// 	timestamp, err := time.Parse("2006-01-02_15-04-05", entry.Timestamp)
 // 	if err != nil {
 // 		return nil, fmt.Errorf("failed to parse timestamp: %v", err)
 // 	}
