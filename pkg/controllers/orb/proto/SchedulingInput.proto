@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package orb;
+
+option go_package = ".";
+
+// TODO: will need to be updated as I continue to update SchedulingInput
+// Anything as bytes are the self-describing wire format provided by K8s
+message SchedulingInput {
+  string timestamp = 1;
+  repeated bytes pendingpod_data = 2;
+  repeated StateNodeWithPods statenodes_data = 3;
+  repeated ReducedInstanceType instancetypes_data = 4;
+}
+
+message StateNodeWithPods {
+  optional bytes node = 1;
+  optional ReducedNodeClaim nodeClaim = 2; // might be problematic?
+  repeated bytes pods = 3;
+
+  message ReducedNodeClaim {
+    string name = 1;
+  }
+}
+
+message ReducedInstanceType {
+  string name = 1;
+  repeated Requirement requirements = 2;
+  repeated Offering offerings = 3;
+
+  message Requirement {
+    repeated string values = 1;
+  }
+  
+  message Offering {
+    repeated Requirement requirements = 1;
+    double price = 2;
+    bool available = 3;
+  }
+}
