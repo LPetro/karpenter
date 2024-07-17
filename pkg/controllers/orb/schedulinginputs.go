@@ -540,15 +540,16 @@ func reduceInstanceTypes(types []*cloudprovider.InstanceType) []*cloudprovider.I
 
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
 func (si SchedulingInput) Marshal() ([]byte, error) {
-	preMarshalSI := &pb.SchedulingInput{
+	return proto.Marshal(&pb.SchedulingInput{
 		Timestamp:         si.Timestamp.Format("2006-01-02_15-04-05"),
 		PendingpodData:    getPodsData(si.PendingPods),
 		StatenodesData:    getStateNodeWithPodsData(si.StateNodesWithPods),
 		InstancetypesData: getInstanceTypesData(si.InstanceTypes),
-	}
-	return proto.Marshal(preMarshalSI)
+	})
 }
 
+// TODO: I can't help but think this is the "harder not smarter" approach here.
+// Is there something in pb.go or protobuf that does this automatically?
 func getPodsData(pods []*v1.Pod) []*pb.ReducedPod {
 	reducedPods := []*pb.ReducedPod{}
 
@@ -569,15 +570,15 @@ func getNodeData(node *v1.Node) *pb.StateNodeWithPods_ReducedNode {
 		return nil
 	}
 
-	// nodeStatus, err := node.Status.Marshal()
-	// if err != nil {
-	// 	return nil
-	// }
+	nodeStatus, err := node.Status.Marshal()
+	if err != nil {
+		return nil
+	}
 
 	// Create a new instance of the reduced node type
 	reducedNode := &pb.StateNodeWithPods_ReducedNode{
 		Name:       node.Name,
-		Nodestatus: nil,
+		Nodestatus: nodeStatus,
 	}
 
 	return reducedNode

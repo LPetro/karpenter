@@ -49,3 +49,12 @@ message ReducedInstanceType {
     bool available = 3;
   }
 }
+
+message SchedulingMetadataMapping {
+  repeated MappingEntry entries = 1;
+
+  message MappingEntry {
+    string action = 1;
+    string timestamp = 2;
+  }
+}

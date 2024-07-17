@@ -116,7 +116,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 
 	// Pop each scheduling metadata off its heap (oldest first) and batch log to PV.
 	if c.schedulingMetadataHeap.Len() > 0 {
-		err := WriteSchedulingMetadataHeapToPV(c.schedulingMetadataHeap)
+		err := LogSchedulingMetadataHeapToPV(c.schedulingMetadataHeap)
 		if err != nil {
 			fmt.Println("Error writing scheduling metadata to PV:", err)
 			return reconcile.Result{}, err
@@ -150,7 +150,7 @@ func (c *Controller) SaveToPV(item SchedulingInput, difftype string) error {
 	// // TODO: Instead of the above, In the interim while I figure out the custom protobuf... Just send string to file
 	// logdata := item.String()
 
-	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05Z")
+	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInput_%s_%s.log", difftype, timestampStr)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
