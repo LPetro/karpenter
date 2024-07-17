@@ -63,8 +63,8 @@ func WriteSchedulingMetadataHeapToPV(heap *SchedulingMetadataHeap) error {
 		return fmt.Errorf("precondition broken, called with invalid heap or empty heap")
 	}
 
-	oldestStr := (*heap)[0].Timestamp.Format("2006-01-02_15-04-05")
-	newestStr := (*heap)[len(*heap)-1].Timestamp.Format("2006-01-02_15-04-05")
+	oldestStr := (*heap)[0].Timestamp.Format("2006-01-02T15:04:05.000Z")
+	newestStr := (*heap)[len(*heap)-1].Timestamp.Format("2006-01-02T15:04:05.000Z")
 	fileName := fmt.Sprintf("SchedulingMetadata_%s_to_%s.log", oldestStr, newestStr)
 	path := filepath.Join("/data", fileName)
 
@@ -79,7 +79,7 @@ func WriteSchedulingMetadataHeapToPV(heap *SchedulingMetadataHeap) error {
 	for heap.Len() > 0 {
 		metadata := heap.Pop().(SchedulingMetadata)
 
-		timestampStr := metadata.Timestamp.Format("2006-01-02_15-04-05")
+		timestampStr := metadata.Timestamp.Format("2006-01-02T15:04:05.000Z")
 		_, err = fmt.Fprintln(file, timestampStr+"\t"+metadata.Action)
 		if err != nil {
 			fmt.Println("Error writing data to file:", err)
@@ -112,7 +112,7 @@ func WriteSchedulingMetadataHeapToPV(heap *SchedulingMetadataHeap) error {
 // 			return nil, fmt.Errorf("invalid line format: %s", line)
 // 		}
 
-// 		timestamp, err := time.Parse("2006-01-02_15-04-05", parts[1])
+// 		timestamp, err := time.Parse("2006-01-02T15:04:05.000Z", parts[1])
 // 		if err != nil {
 // 			return nil, fmt.Errorf("failed to parse timestamp: %v", err)
 // 		}
