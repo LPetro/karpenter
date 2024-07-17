@@ -567,6 +567,10 @@ func getPodsData(pods []*v1.Pod) [][]byte {
 
 // Function to get node proto data
 func getNodeData(node *v1.Node) []byte {
+	if node == nil {
+		return nil
+	}
+
 	nodeData, err := proto.Marshal(node)
 	if err != nil {
 		fmt.Println("Error marshaling node:", err)
