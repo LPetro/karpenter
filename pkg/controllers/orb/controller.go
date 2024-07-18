@@ -80,10 +80,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	// Pop each scheduling input off my heap (oldest first) and batch log in PV
 	for c.schedulingInputHeap.Len() > 0 {
 		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput)
-
-		inputDiffAdded := &SchedulingInput{}
-		inputDiffRemoved := &SchedulingInput{}
-		inputDiffChanged := &SchedulingInput{}
+		inputDiffAdded, inputDiffRemoved, inputDiffChanged := &SchedulingInput{}, &SchedulingInput{}, &SchedulingInput{}
 
 		// Set the baseline on initial input or upon rebaselining
 		if c.mostRecentSchedulingInput == nil || c.rebaseline {
@@ -93,12 +90,9 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 				return reconcile.Result{}, err
 			}
 			c.rebaseline = false
+			c.mostRecentSchedulingInput = &currentInput
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
 			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentSchedulingInput)
-			// if inputDiffAdded == nil && inputDiffRemoved == nil && inputDiffChanged == nil {
-			// 	// No changes to scheduling inputs since last save. TODO: I'm not convinced we need this / get to this point ever.
-			// 	continue
-			// }
 			err := c.logSchedulingDifferencesToPV(*inputDiffAdded, *inputDiffRemoved, *inputDiffChanged, currentInput.Timestamp)
 			if err != nil {
 				fmt.Println("Error saving to PV:", err)
@@ -106,10 +100,13 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			}
 		}
 
-		c.mostRecentSchedulingInput = &currentInput
+		// Updates the internal differences every loop, as opposed to every baseline.
+		// This requires reconstruction at an arbitrary time to take in the last baseline and the whole list of changes since
+		// A more memory intensive way would be to only internally keep the last baseline printed, than any diff+baseline would be reconstructable.
+		// c.mostRecentSchedulingInput = &currentInput
 
 		// // (also loopback test it)
-		// err = c.testReadPVandReconstruct(item)
+		// err := c.testReadPVandReconstruct(item)
 		// if err != nil {
 		// 	fmt.Println("Error reconstructing from PV:", err)
 		// 	return reconcile.Result{}, err
