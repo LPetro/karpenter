@@ -103,12 +103,12 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// A more memory intensive way would be to only internally keep the last baseline printed, than any diff+baseline would be reconstructable.
 		// c.mostRecentSchedulingInput = &currentInput
 
-		// (also loopback test it)
-		err := testReadPVandReconstruct(currentInput.Timestamp)
-		if err != nil {
-			fmt.Println("Error reconstructing from PV:", err)
-			return reconcile.Result{}, err
-		}
+		// // (also loopback test it)
+		// err := testReadPVandReconstruct(currentInput.Timestamp)
+		// if err != nil {
+		// 	fmt.Println("Error reconstructing from PV:", err)
+		// 	return reconcile.Result{}, err
+		// }
 	}
 
 	// Batch log scheduling metadata to PV.
