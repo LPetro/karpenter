@@ -48,23 +48,23 @@ const ( // Constants for calculating the moving average of the rebaseline
 )
 
 type Controller struct {
-	schedulingInputHeap       *SchedulingInputHeap    // Batches logs of inputs to heap
-	schedulingMetadataHeap    *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
-	mostRecentSchedulingInput *SchedulingInput        // The most recently saved filename (for checking for changes)
-	baselineSize              int                     // The size of the currently basedlined SchedulingInput in bytes
-	rebaselineThreshold       float32                 // The percentage threshold (between 0 and 1)
-	deltaToBaselineAvg        float32                 // The average delta to the baseline, moving average
-	rebaseline                bool                    // Whether or not we should rebaseline (when the threshold is crossed)
+	schedulingInputHeap    *SchedulingInputHeap    // Batches logs of inputs to heap
+	schedulingMetadataHeap *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
+	mostRecentBaseline     *SchedulingInput        // The most recently saved baseline scheduling input
+	baselineSize           int                     // The size of the currently basedlined SchedulingInput in bytes
+	rebaselineThreshold    float32                 // The percentage threshold (between 0 and 1)
+	deltaToBaselineAvg     float32                 // The average delta to the baseline, moving average
+	rebaseline             bool                    // Whether or not we should rebaseline (when the threshold is crossed)
 }
 
 // TODO: add struct elements and their instantiations, when defined
 func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataHeap *SchedulingMetadataHeap) *Controller {
 	return &Controller{
-		schedulingInputHeap:       schedulingInputHeap,
-		schedulingMetadataHeap:    schedulingMetadataHeap,
-		mostRecentSchedulingInput: nil,
-		rebaseline:                true,
-		rebaselineThreshold:       initialDeltaThreshold,
+		schedulingInputHeap:    schedulingInputHeap,
+		schedulingMetadataHeap: schedulingMetadataHeap,
+		mostRecentBaseline:     nil,
+		rebaseline:             true,
+		rebaselineThreshold:    initialDeltaThreshold,
 		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
 		//      That would have to be a delete/replace since PV files are immutable.
 	}
@@ -83,16 +83,16 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		inputDiffAdded, inputDiffRemoved, inputDiffChanged := &SchedulingInput{}, &SchedulingInput{}, &SchedulingInput{}
 
 		// Set the baseline on initial input or upon rebaselining
-		if c.mostRecentSchedulingInput == nil || c.rebaseline {
+		if c.mostRecentBaseline == nil || c.rebaseline {
 			err := c.logSchedulingBaselineToPV(currentInput)
 			if err != nil {
 				fmt.Println("Error saving to PV:", err)
 				return reconcile.Result{}, err
 			}
 			c.rebaseline = false
-			c.mostRecentSchedulingInput = &currentInput
+			c.mostRecentBaseline = &currentInput
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
-			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentSchedulingInput)
+			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentBaseline)
 			err := c.logSchedulingDifferencesToPV(*inputDiffAdded, *inputDiffRemoved, *inputDiffChanged, currentInput.Timestamp)
 			if err != nil {
 				fmt.Println("Error saving to PV:", err)
@@ -101,7 +101,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		}
 
 		// Updates the internal differences every loop, as opposed to every baseline.
-		// This requires reconstruction at an arbitrary time to take in the last baseline and the whole list of changes since
+		// This requires reconstruction at an arbitrary time to take in the last baseline and the whole list of changes since then.
 		// A more memory intensive way would be to only internally keep the last baseline printed, than any diff+baseline would be reconstructable.
 		// c.mostRecentSchedulingInput = &currentInput
 
