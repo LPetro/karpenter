@@ -40,7 +40,7 @@ import (
 )
 
 const ( // Constants for calculating the moving average of the rebaseline
-	initialDeltaThreshold = 0.50
+	initialDeltaThreshold = 0.050
 	decayFactor           = 0.9
 	updateFactor          = 0.1
 	thresholdMultiplier   = 1.2
@@ -229,9 +229,6 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 
 // Functions for a moving average heuristic to decide to rebaseline the files
 func (c *Controller) updateRebaseline(diffSize int) bool {
-	fmt.Println("Current baseline size is:", c.baselineSize)
-	fmt.Println("Current diffsize is:", diffSize)
-
 	diffSizeFloat := float32(diffSize)
 	baselineSizeFloat := float32(c.baselineSize)
 
