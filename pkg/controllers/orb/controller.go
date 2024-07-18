@@ -31,7 +31,6 @@ import (
 
 	//"google.golang.org/protobuf/proto"
 	proto "github.com/gogo/protobuf/proto"
-	v1 "k8s.io/api/core/v1"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -251,25 +250,25 @@ func (c *Controller) updateThreshold(diffSize, baselineSize float32) {
 
 /* These will be part of the command-line printing representation... */
 
-// For testing, pull pending pod and print as string.
-func UnmarshalPod(data []byte) (*v1.Pod, error) {
-	pod := &v1.Pod{}
-	if err := proto.Unmarshal(data, pod); err != nil {
-		fmt.Println("Error unmarshaling pod:", err)
-		return nil, err
-	}
-	return pod, nil
-}
+// // For testing, pull pending pod and print as string.
+// func UnmarshalPod(data []byte) (*v1.Pod, error) {
+// 	pod := &v1.Pod{}
+// 	if err := proto.Unmarshal(data, pod); err != nil {
+// 		fmt.Println("Error unmarshaling pod:", err)
+// 		return nil, err
+// 	}
+// 	return pod, nil
+// }
 
-// Function to unmarshal and print a pod
-func PrintPodPB(data []byte) {
-	pod, err := UnmarshalPod(data)
-	if err != nil {
-		fmt.Println("Error deserializing pod:", err)
-		return
-	}
-	fmt.Println("Pod is: ", PodToString(pod))
-}
+// // Function to unmarshal and print a pod
+// func PrintPodPB(data []byte) {
+// 	pod, err := UnmarshalPod(data)
+// 	if err != nil {
+// 		fmt.Println("Error deserializing pod:", err)
+// 		return
+// 	}
+// 	fmt.Println("Pod is: ", PodToString(pod))
+// }
 
 // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
 // They highly recommend sanitizing inputs before accessing that path.
