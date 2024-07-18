@@ -63,8 +63,6 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 		mostRecentBaseline:     nil,
 		rebaseline:             true,
 		rebaselineThreshold:    initialDeltaThreshold,
-		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
-		//      That would have to be a delete/replace since PV files are immutable.
 	}
 }
 
@@ -98,17 +96,12 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			}
 		}
 
-		// Updates the internal differences every loop, as opposed to every baseline.
-		// This requires reconstruction at an arbitrary time to take in the last baseline and the whole list of changes since then.
-		// A more memory intensive way would be to only internally keep the last baseline printed, than any diff+baseline would be reconstructable.
-		// c.mostRecentSchedulingInput = &currentInput
-
-		// // (also loopback test it)
-		// err := testReadPVandReconstruct(currentInput.Timestamp)
-		// if err != nil {
-		// 	fmt.Println("Error reconstructing from PV:", err)
-		// 	return reconcile.Result{}, err
-		// }
+		// (also loopback test it)
+		err := testReadPVandReconstruct(currentInput.Timestamp)
+		if err != nil {
+			fmt.Println("Error reconstructing from PV:", err)
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Batch log scheduling metadata to PV.
@@ -146,9 +139,10 @@ func (c *Controller) logSchedulingBaselineToPV(item SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
-	// Print string debugging
-	c.writeStringtoPV(item.String(), path)
+	// // Print string debugging
+	// c.writeStringtoPV(item.String(), path)
 
+	fmt.Println("Data has this length", len(logdata))
 	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
 }
@@ -223,27 +217,25 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 	return nil
 }
 
-// For debugging TODO Remove later
-func (c *Controller) writeStringtoPV(logstring string, path string) error {
-	// add .txt to the path file
-	path = strings.Replace(path, ".log", ".txt", 1) // .log -> .txt
+// // For debugging TODO Remove later
+// func (c *Controller) writeStringtoPV(logstring string, path string) error {
+// 	// add .txt to the path file
+// 	path = strings.Replace(path, ".log", ".txt", 1) // .log -> .txt
 
-	file, err := os.Create(path)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
+// 	file, err := os.Create(path)
+// 	if err != nil {
+// 		fmt.Println("Error opening file:", err)
+// 		return err
+// 	}
+// 	defer file.Close()
 
-	_, err = io.WriteString(file, logstring)
-	if err != nil {
-		fmt.Println("Error writing data to file:", err)
-		return err
-	}
-	return nil
-}
-
-// This function tests whether we can read from the PV and reconstruct the data
+// 	_, err = io.WriteString(file, logstring)
+// 	if err != nil {
+// 		fmt.Println("Error writing data to file:", err)
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // Functions for a moving average heuristic to decide to rebaseline the files
 func (c *Controller) updateRebaseline(diffSize int) bool {
@@ -274,26 +266,6 @@ func (c *Controller) updateThreshold(diffSize, baselineSize float32) {
 // This function tests whether we can read from the PV and reconstruct the data
 
 /* These will be part of the command-line printing representation... */
-
-// // For testing, pull pending pod and print as string.
-// func UnmarshalPod(data []byte) (*v1.Pod, error) {
-// 	pod := &v1.Pod{}
-// 	if err := proto.Unmarshal(data, pod); err != nil {
-// 		fmt.Println("Error unmarshaling pod:", err)
-// 		return nil, err
-// 	}
-// 	return pod, nil
-// }
-
-// // Function to unmarshal and print a pod
-// func PrintPodPB(data []byte) {
-// 	pod, err := UnmarshalPod(data)
-// 	if err != nil {
-// 		fmt.Println("Error deserializing pod:", err)
-// 		return
-// 	}
-// 	fmt.Println("Pod is: ", PodToString(pod))
-// }
 
 // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
 // They highly recommend sanitizing inputs before accessing that path.
@@ -335,13 +307,15 @@ func ReconstructSchedulingInput(fileName string) (*SchedulingInput, error) {
 		return nil, err
 	}
 
-	si, err := UnmarshalSchedulingInput(readdata)
-	if err != nil {
-		fmt.Println("Error converting PB to SI:", err)
-		return nil, err
-	}
+	fmt.Println("Data has this length", len(readdata))
+	return nil, nil
+	// si, err := UnmarshalSchedulingInput(readdata)
+	// if err != nil {
+	// 	fmt.Println("Error converting PB to SI:", err)
+	// 	return nil, err
+	// }
 
-	return si, nil
+	// return si, nil
 }
 
 func testReadPVandReconstruct(timestamp time.Time) error {
