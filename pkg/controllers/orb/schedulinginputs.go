@@ -538,14 +538,37 @@ func reduceInstanceTypes(types []*cloudprovider.InstanceType) []*cloudprovider.I
 	return reducedInstanceTypes
 }
 
+// Function to take the 3 Scheduling Input differenced (added, removed and changed) and
+// Marshal them as one "differences" protobuf. This is an abstraction layer for management of
+// differences over time and make reconstruction easier.
+func protoDifferences(DiffAdded SchedulingInput, DiffRemoved SchedulingInput, DiffChanged SchedulingInput) *pb.Differences {
+	return &pb.Differences{
+		Added:   protoSchedulingInput(DiffAdded),
+		Removed: protoSchedulingInput(DiffRemoved),
+		Changed: protoSchedulingInput(DiffChanged),
+	}
+}
+
+func MarshalDifferences(differences *pb.Differences) ([]byte, error) {
+	return proto.Marshal(differences)
+}
+
+// Function to take the 3 Scheduling Input differenced (added, removed and changed) and
+// Marshal them as one "differences" protobuf. This is an abstraction layer for management of
+// differences over time and make reconstruction easier.
+
 // Function take a Scheduling Input to []byte, marshalled as a protobuf
 func (si SchedulingInput) Marshal() ([]byte, error) {
-	return proto.Marshal(&pb.SchedulingInput{
+	return proto.Marshal(protoSchedulingInput(si))
+}
+
+func protoSchedulingInput(si SchedulingInput) *pb.SchedulingInput {
+	return &pb.SchedulingInput{
 		Timestamp:         si.Timestamp.Format("2006-01-02_15-04-05"),
 		PendingpodData:    getPodsData(si.PendingPods),
 		StatenodesData:    getStateNodeWithPodsData(si.StateNodesWithPods),
 		InstancetypesData: getInstanceTypesData(si.InstanceTypes),
-	})
+	}
 }
 
 // TODO: I can't help but think this is the "harder not smarter" approach here.
