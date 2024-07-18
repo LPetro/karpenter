@@ -40,7 +40,7 @@ import (
 )
 
 const ( // Constants for calculating the moving average of the rebaseline
-	initialDeltaThreshold = 0.25
+	initialDeltaThreshold = 0.50
 	decayFactor           = 0.9
 	updateFactor          = 0.1
 	thresholdMultiplier   = 1.2
@@ -64,7 +64,7 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 		schedulingMetadataHeap:    schedulingMetadataHeap,
 		mostRecentSchedulingInput: nil,
 		rebaseline:                true,
-		rebaselineThreshold:       0.50, // Initial threshold for rebasing.
+		rebaselineThreshold:       initialDeltaThreshold,
 		//TODO: this isn't consistent through restarts of Karpenter. Would want a way to pull the most recent. Maybe a metadata file?
 		//      That would have to be a delete/replace since PV files are immutable.
 	}
@@ -228,6 +228,9 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 
 // Functions for a moving average heuristic to decide to rebaseline the files
 func (c *Controller) updateRebaseline(diffSize int) bool {
+	fmt.Println("Current baseline size is:", c.baselineSize)
+	fmt.Println("Current diffsize is:", diffSize)
+
 	diffSizeFloat := float32(diffSize)
 	baselineSizeFloat := float32(c.baselineSize)
 
