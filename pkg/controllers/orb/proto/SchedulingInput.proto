@@ -50,7 +50,9 @@ message ReducedInstanceType {
   repeated Offering offerings = 3;
 
   message Requirement {
-    repeated string values = 1;
+    string key = 1;
+    repeated string values = 2;
+    string nodeselectoroperator = 3;
   }
   
   message Offering {

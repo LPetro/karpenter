@@ -17,7 +17,6 @@ limitations under the License.
 package orb
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -86,7 +85,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		if c.mostRecentBaseline == nil || c.rebaseline {
 			err := c.logSchedulingBaselineToPV(currentInput)
 			if err != nil {
-				fmt.Println("Error saving to PV:", err)
+				fmt.Println("Error saving baseline to PV:", err)
 				return reconcile.Result{}, err
 			}
 			c.rebaseline = false
@@ -95,7 +94,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentBaseline)
 			err := c.logSchedulingDifferencesToPV(*inputDiffAdded, *inputDiffRemoved, *inputDiffChanged, currentInput.Timestamp)
 			if err != nil {
-				fmt.Println("Error saving to PV:", err)
+				fmt.Println("Error saving differences to PV:", err)
 				return reconcile.Result{}, err
 			}
 		}
@@ -105,21 +104,19 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		// A more memory intensive way would be to only internally keep the last baseline printed, than any diff+baseline would be reconstructable.
 		// c.mostRecentSchedulingInput = &currentInput
 
-		// // (also loopback test it)
-		// err := c.testReadPVandReconstruct(item)
-		// if err != nil {
-		// 	fmt.Println("Error reconstructing from PV:", err)
-		// 	return reconcile.Result{}, err
-		// }
-	}
-
-	// Pop each scheduling metadata off its heap (oldest first) and batch log to PV.
-	if c.schedulingMetadataHeap.Len() > 0 {
-		err := c.logSchedulingMetadataToPV(c.schedulingMetadataHeap)
+		// (also loopback test it)
+		err := testReadPVandReconstruct(currentInput.Timestamp)
 		if err != nil {
-			fmt.Println("Error writing scheduling metadata to PV:", err)
+			fmt.Println("Error reconstructing from PV:", err)
 			return reconcile.Result{}, err
 		}
+	}
+
+	// Batch log scheduling metadata to PV.
+	err := c.logSchedulingMetadataToPV(c.schedulingMetadataHeap)
+	if err != nil {
+		fmt.Println("Error writing scheduling metadata to PV:", err)
+		return reconcile.Result{}, err
 	}
 
 	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
@@ -177,7 +174,7 @@ func (c *Controller) logSchedulingDifferencesToPV(DiffAdded SchedulingInput, Dif
 
 func (c *Controller) logSchedulingMetadataToPV(heap *SchedulingMetadataHeap) error {
 	if heap == nil || heap.Len() == 0 {
-		return fmt.Errorf("called with invalid heap or empty heap")
+		return nil // Default behavior, log nothing.
 	}
 
 	oldestStr := (*heap)[0].Timestamp.Format("2006-01-02_15-04-05")
@@ -288,80 +285,69 @@ func sanitizePath(path string) string {
 }
 
 // Function to pull from an S3 bucket
-func ReadFromPV(logname string) (time.Time, []byte, error) {
-	sanitizedname := sanitizePath(logname)
-	path := filepath.Join("/data", sanitizedname)
-
-	// Open the file for reading
+func ReadFromPV(logname string) ([]byte, error) {
+	path := filepath.Join("/data", sanitizePath(logname))
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
-		return time.Time{}, nil, err
+		return nil, err
 	}
 	defer file.Close()
 
-	// TODO: This will be as simple as an io.ReadAll for all the contents, once I customize an SI .proto
-
-	// Create a new buffered reader
-	reader := bufio.NewReader(file)
-
-	// Read the first line as a string
-	timestampStr, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading timestamp:", err)
-		return time.Time{}, nil, err
-	}
-	timestampStr = strings.TrimSuffix(timestampStr, "\n")
-
-	// Read the remaining bytes
-	// TODO: This will be bytes at a time until a newline, which will follow a schema
-	// defined for Scheduling Inputs in order to best keep track of protobufs and reconstruct
-	contents, err := io.ReadAll(reader)
+	contents, err := io.ReadAll(file)
 	if err != nil {
 		fmt.Println("Error reading file bytes:", err)
-		return time.Time{}, nil, err
+		return nil, err
 	}
-
-	timestamp, err := time.Parse("2006-01-02_15-04-05", timestampStr)
-	if err != nil {
-		fmt.Println("Error parsing timestamp:", err)
-		return time.Time{}, nil, err
-	}
-
-	return timestamp, contents, nil
+	return contents, nil
 }
 
-// // Function for reconstructing inputs
-// func ReconstructSchedulingInput(fileName string) error {
+// Function for reconstructing inputs
+// Read from the PV to check (will be what the ORB tool does from the Command Line)
+func ReconstructSchedulingInput(fileName string) (*SchedulingInput, error) {
+	readdata, err := ReadFromPV(fileName)
+	if err != nil {
+		fmt.Println("Error reading from PV:", err)
+		return nil, err
+	}
 
-// 	// Read from the PV to check (will be what the ORB tool does from the Command Line)
-// 	readTimestamp, readdata, err := ReadFromPV(fileName)
-// 	if err != nil {
-// 		fmt.Println("Error reading from PV:", err)
-// 		return err
-// 	}
+	si, err := UnmarshalSchedulingInput(readdata)
+	if err != nil {
+		fmt.Println("Error converting PB to SI:", err)
+		return nil, err
+	}
 
-// 	// Protobuff to si
-// 	si, err := PBToSchedulingInput(readTimestamp, readdata)
-// 	if err != nil {
-// 		fmt.Println("Error converting PB to SI:", err)
-// 		return err
-// 	}
-// 	// Print the reconstructed scheduling input
-// 	fmt.Println("Reconstructed Scheduling Input looks like:\n" + si.String())
-// 	return nil
-// }
+	return si, nil
+}
 
-// func testReadPVandReconstruct(item SchedulingInput) error {
-// 	// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
-// 	// In reality, we could just pull a file from a known directory
-// 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
-// 	fileName := fmt.Sprintf("ProvisioningSchedulingInput_%s.log", timestampStr)
+func testReadPVandReconstruct(timestamp time.Time) error {
+	// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
+	// In reality, we could just pull a file from a known directory
+	timestampStr := timestamp.Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 
-// 	err := ReconstructSchedulingInput(fileName)
-// 	if err != nil {
-// 		fmt.Println("Error reconstructing scheduling input:", err)
-// 		return err
-// 	}
-// 	return nil
-// }
+	si, err := ReconstructSchedulingInput(fileName)
+	if err != nil {
+		fmt.Println("Error reconstructing scheduling input:", err)
+		return err
+	}
+
+	fmt.Println("Reconstructed Scheduling Input looks like:\n" + si.String())
+	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.log", timestampStr)
+	path := filepath.Join("/data", reconstructedFilename)
+	file, err := os.Create(path)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(si.String())
+	if err != nil {
+		fmt.Println("Error writing reconstruction to file:", err)
+		return err
+	}
+
+	fmt.Println("Reconstruction written to file successfully!")
+	return nil
+}
