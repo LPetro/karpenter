@@ -40,7 +40,7 @@ import (
 )
 
 const ( // Constants for calculating the moving average of the rebaseline
-	initialDeltaThreshold = 0.050
+	initialDeltaThreshold = 0.50
 	decayFactor           = 0.9
 	updateFactor          = 0.1
 	thresholdMultiplier   = 1.2
