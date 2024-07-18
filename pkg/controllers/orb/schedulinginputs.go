@@ -129,33 +129,33 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) (*SchedulingInput, *Sche
 	}
 
 	diffRemoved := &SchedulingInput{
-		Timestamp:          si.Timestamp, // i.e. the time of those (newer) differences
+		Timestamp:          si.Timestamp,
 		PendingPods:        pendingPodsRemoved,
 		StateNodesWithPods: stateNodesRemoved,
 		InstanceTypes:      instanceTypesRemoved,
 	}
 
 	diffChanged := &SchedulingInput{
-		Timestamp:          si.Timestamp, // i.e. the time of those (newer) differences
+		Timestamp:          si.Timestamp,
 		PendingPods:        pendingPodsChanged,
 		StateNodesWithPods: stateNodesChanged,
 		InstanceTypes:      instanceTypesChanged,
 	}
 
 	if len(pendingPodsAdded)+len(stateNodesAdded)+len(instanceTypesAdded) == 0 {
-		diffAdded = nil
+		diffAdded = &SchedulingInput{}
 	} else {
 		fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
 	}
 
 	if len(pendingPodsRemoved)+len(stateNodesRemoved)+len(instanceTypesRemoved) == 0 {
-		diffRemoved = nil
+		diffRemoved = &SchedulingInput{}
 	} else {
 		fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
 	}
 
 	if len(pendingPodsChanged)+len(stateNodesChanged)+len(instanceTypesChanged) == 0 {
-		diffChanged = nil
+		diffChanged = &SchedulingInput{}
 	} else {
 		fmt.Println("Diff Scheduling Input changed is... ", diffChanged.String()) // Test print, delete later
 	}

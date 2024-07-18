@@ -95,10 +95,10 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			c.rebaseline = false
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
 			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentSchedulingInput)
-			if inputDiffAdded == nil && inputDiffRemoved == nil && inputDiffChanged == nil {
-				// No changes to scheduling inputs since last save. TODO: I'm not convinced we need this / get to this point ever.
-				continue
-			}
+			// if inputDiffAdded == nil && inputDiffRemoved == nil && inputDiffChanged == nil {
+			// 	// No changes to scheduling inputs since last save. TODO: I'm not convinced we need this / get to this point ever.
+			// 	continue
+			// }
 			err := c.logSchedulingDifferencesToPV(*inputDiffAdded, *inputDiffRemoved, *inputDiffChanged, currentInput.Timestamp)
 			if err != nil {
 				fmt.Println("Error saving to PV:", err)
