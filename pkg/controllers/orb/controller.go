@@ -146,6 +146,9 @@ func (c *Controller) logSchedulingBaselineToPV(item SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join("/data", fileName) // mountPath := /data in our PVC yaml
 
+	// Print string debugging
+	c.writeStringtoPV(item.String(), path)
+
 	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
 }
@@ -219,6 +222,28 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 	}
 	return nil
 }
+
+// For debugging TODO Remove later
+func (c *Controller) writeStringtoPV(logstring string, path string) error {
+	// add .txt to the path file
+	path = strings.Replace(path, ".log", ".txt", 1) // .log -> .txt
+
+	file, err := os.Create(path)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, logstring)
+	if err != nil {
+		fmt.Println("Error writing data to file:", err)
+		return err
+	}
+	return nil
+}
+
+// This function tests whether we can read from the PV and reconstruct the data
 
 // Functions for a moving average heuristic to decide to rebaseline the files
 func (c *Controller) updateRebaseline(diffSize int) bool {
