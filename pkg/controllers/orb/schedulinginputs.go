@@ -111,8 +111,6 @@ func reducePods(pods []*v1.Pod) []*v1.Pod {
 				Phase: pod.Status.Phase,
 			},
 		}
-		fmt.Println("New ReducedPod: ", reducedPod.String())
-		fmt.Println("My ReducedPod: ", PodToString(reducedPod))
 		reducedPods = append(reducedPods, reducedPod)
 	}
 	return reducedPods
