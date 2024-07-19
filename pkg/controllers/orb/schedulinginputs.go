@@ -45,8 +45,8 @@ type SchedulingInput struct {
 }
 
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
-	pendingPods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes []*cloudprovider.InstanceType) *SchedulingInput {
-	return &SchedulingInput{
+	pendingPods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes []*cloudprovider.InstanceType) SchedulingInput {
+	return SchedulingInput{
 		Timestamp:          scheduledTime,
 		PendingPods:        pendingPods,
 		StateNodesWithPods: newStateNodesWithPods(ctx, kubeClient, stateNodes),
