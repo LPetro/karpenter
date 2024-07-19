@@ -175,8 +175,8 @@ func protoRequirements(requirements scheduling.Requirements) []*pb.ReducedInstan
 	requirementsData := []*pb.ReducedInstanceType_ReducedRequirement{}
 	for _, requirement := range requirements {
 		requirementsData = append(requirementsData, &pb.ReducedInstanceType_ReducedRequirement{
-			Key:                  requirement.Key,
-			Nodeselectoroperator: string(requirement.Operator()),
+			Key:                  "", //requirement.Key,
+			Nodeselectoroperator: "", //string(requirement.Operator()),
 			Values:               requirement.Values(),
 		})
 	}
