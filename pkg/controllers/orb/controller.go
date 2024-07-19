@@ -96,12 +96,12 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 			}
 		}
 
-		// (also loopback test it)
-		err := testReadPVandReconstruct(currentInput.Timestamp)
-		if err != nil {
-			fmt.Println("Error reconstructing from PV:", err)
-			return reconcile.Result{}, err
-		}
+		// // (also loopback test it)
+		// err := testReadPVandReconstruct(currentInput.Timestamp)
+		// if err != nil {
+		// 	fmt.Println("Error reconstructing from PV:", err)
+		// 	return reconcile.Result{}, err
+		// }
 	}
 
 	// Batch log scheduling metadata to PV.
@@ -142,7 +142,12 @@ func (c *Controller) logSchedulingBaselineToPV(item SchedulingInput) error {
 	// // Print string debugging
 	// c.writeStringtoPV(item.String(), path)
 
-	fmt.Println("Data has this length", len(logdata))
+	// Does this error?
+	data := []byte{}
+	returnCheck := &pb.SchedulingInput{}
+	proto.Unmarshal(data, returnCheck)
+	fmt.Println(data[0])
+
 	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
 }
@@ -307,15 +312,13 @@ func ReconstructSchedulingInput(fileName string) (*SchedulingInput, error) {
 		return nil, err
 	}
 
-	fmt.Println("Data has this length", len(readdata))
-	return nil, nil
-	// si, err := UnmarshalSchedulingInput(readdata)
-	// if err != nil {
-	// 	fmt.Println("Error converting PB to SI:", err)
-	// 	return nil, err
-	// }
+	si, err := UnmarshalSchedulingInput(readdata)
+	if err != nil {
+		fmt.Println("Error converting PB to SI:", err)
+		return nil, err
+	}
 
-	// return si, nil
+	return si, nil
 }
 
 func testReadPVandReconstruct(timestamp time.Time) error {

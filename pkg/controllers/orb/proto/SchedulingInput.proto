@@ -1,12 +1,10 @@
 syntax = "proto3";
 
-package orb;
+option go_package = "sigs.k8s.io/karpenter/pkg/controllers/orb/proto";
 
-option go_package = ".";
-
-message SchedulingInputDifferencesMapping {
-  repeated Differences differences = 1;
-}
+// message SchedulingInputDifferencesMapping {
+//   repeated Differences differences = 1;
+// }
 
 message Differences {
   optional SchedulingInput added = 1;
@@ -63,7 +61,7 @@ message ReducedInstanceType {
   }
 }
 
-message SchedulingMetadataMapping {
+message SchedulingMetadataMap {
   repeated MappingEntry entries = 1;
 
   message MappingEntry {
