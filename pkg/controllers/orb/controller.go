@@ -184,10 +184,10 @@ func (c *Controller) logSchedulingMetadataToPV(heap *SchedulingMetadataHeap) err
 	path := filepath.Join("/data", fileName)
 
 	// Pop each scheduling metadata off its heap (oldest first) and batch log to PV.
-	mapping := &pb.SchedulingMetadataMapping{}
+	mapping := &pb.SchedulingMetadataMap{}
 	for heap.Len() > 0 {
 		metadata := heap.Pop().(SchedulingMetadata)
-		entry := &pb.SchedulingMetadataMapping_MappingEntry{
+		entry := &pb.SchedulingMetadataMap_MappingEntry{
 			Action:    metadata.Action,
 			Timestamp: metadata.Timestamp.Format("2006-01-02_15-04-05"),
 		}
