@@ -44,21 +44,40 @@ type SchedulingInput struct {
 	// TODO: all the other scheduling inputs... (bindings?)
 }
 
-func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
-	pendingPods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes []*cloudprovider.InstanceType) SchedulingInput {
-	return SchedulingInput{
-		Timestamp:          scheduledTime,
-		PendingPods:        pendingPods,
-		StateNodesWithPods: newStateNodesWithPods(ctx, kubeClient, stateNodes),
-		InstanceTypes:      instanceTypes,
-	}
-}
-
 // A stateNode with the Pods it has on it.
 type StateNodeWithPods struct {
 	Node      *v1.Node
 	NodeClaim *v1beta1.NodeClaim
 	Pods      []*v1.Pod
+}
+
+// Construct and reduce the Scheduling Input down to what's minimally required for re-simulation
+func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
+	pendingPods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes []*cloudprovider.InstanceType) SchedulingInput {
+	return SchedulingInput{
+		Timestamp:          scheduledTime,
+		PendingPods:        reducePods(pendingPods),
+		StateNodesWithPods: newStateNodesWithPods(ctx, kubeClient, stateNodes),
+		InstanceTypes:      reduceInstanceTypes(instanceTypes),
+	}
+}
+
+func (snp StateNodeWithPods) GetName() string {
+	if snp.Node == nil {
+		return snp.NodeClaim.GetName()
+	}
+	return snp.Node.GetName()
+}
+
+// TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
+// which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
+func (si SchedulingInput) String() string {
+	return fmt.Sprintf("Timestamp (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nInstanceTypes:\n%v\n\n",
+		si.Timestamp.Format("2006-01-02_15-04-05"),
+		PodsToString(si.PendingPods),
+		StateNodesWithPodsToString(si.StateNodesWithPods),
+		InstanceTypesToString(si.InstanceTypes),
+	)
 }
 
 func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
@@ -78,31 +97,6 @@ func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 	return stateNodesWithPods
 }
 
-func (snp StateNodeWithPods) GetName() string {
-	if snp.Node == nil {
-		return snp.NodeClaim.GetName()
-	}
-	return snp.Node.GetName()
-}
-
-// Reduce the Scheduling Input down to what's minimally required for re-simulation, in place
-func (si *SchedulingInput) Reduce() {
-	si.PendingPods = reducePods(si.PendingPods)
-	// StateNodesWithPods are constructed with their StateNodes and Pods reduced
-	si.InstanceTypes = reduceInstanceTypes(si.InstanceTypes)
-}
-
-// TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
-// which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
-func (si SchedulingInput) String() string {
-	return fmt.Sprintf("Timestamp (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nInstanceTypes:\n%v\n\n",
-		si.Timestamp.Format("2006-01-02_15-04-05"),
-		PodsToString(si.PendingPods),
-		StateNodesWithPodsToString(si.StateNodesWithPods),
-		InstanceTypesToString(si.InstanceTypes),
-	)
-}
-
 /* Functions to reduce resources in Scheduling Inputs to the constituent parts we care to log / introspect */
 
 func reducePods(pods []*v1.Pod) []*v1.Pod {
@@ -117,6 +111,8 @@ func reducePods(pods []*v1.Pod) []*v1.Pod {
 				Phase: pod.Status.Phase,
 			},
 		}
+		fmt.Println("New ReducedPod: ", reducedPod.String())
+		fmt.Println("My ReducedPod: ", PodToString(reducedPod))
 		reducedPods = append(reducedPods, reducedPod)
 	}
 	return reducedPods
@@ -163,7 +159,7 @@ func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings 
 	return strippedOfferings
 }
 
-// Grab only these key'd values from requirements... karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
+// Reduce Requirements returns Requirements of these keys: karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
 // TODO Should these keys be called more generically? i.e. via v1beta1.CapacityTypeLabelKey, v1.LabelTopologyZone or something?
 func reduceRequirements(requirements scheduling.Requirements) scheduling.Requirements {
 	reducedRequirements := scheduling.Requirements{}
@@ -176,18 +172,16 @@ func reduceRequirements(requirements scheduling.Requirements) scheduling.Require
 	return reducedRequirements
 }
 
-func reduceInstanceTypes(types []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
-	var reducedInstanceTypes []*cloudprovider.InstanceType
-
-	for _, instanceType := range types {
+func reduceInstanceTypes(its []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
+	reducedInstanceTypes := []*cloudprovider.InstanceType{}
+	for _, it := range its {
 		reducedInstanceType := &cloudprovider.InstanceType{
-			Name:         instanceType.Name,
-			Requirements: reduceRequirements(instanceType.Requirements),
-			Offerings:    reduceOfferings(instanceType.Offerings.Available()),
+			Name:         it.Name,
+			Requirements: reduceRequirements(it.Requirements),
+			Offerings:    reduceOfferings(it.Offerings.Available()),
 		}
 		reducedInstanceTypes = append(reducedInstanceTypes, reducedInstanceType)
 	}
-
 	return reducedInstanceTypes
 }
 
@@ -208,6 +202,7 @@ func MarshalSchedulingInput(si *SchedulingInput) ([]byte, error) {
 
 func UnmarshalSchedulingInput(schedulingInputData []byte) (*SchedulingInput, error) {
 	entry := &pb.SchedulingInput{}
+
 	if err := proto.Unmarshal(schedulingInputData, entry); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal SchedulingInput: %v", err)
 	}
@@ -216,6 +211,5 @@ func UnmarshalSchedulingInput(schedulingInputData []byte) (*SchedulingInput, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to reconstruct SchedulingInput: %v", err)
 	}
-
 	return si, nil
 }

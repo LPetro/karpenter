@@ -67,7 +67,6 @@ func NewSchedulingInputHeap() *SchedulingInputHeap {
 func (h *SchedulingInputHeap) LogSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
 	pods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes map[string][]*cloudprovider.InstanceType) {
 	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, instanceTypes["default"])
-	si.Reduce()
 	h.Push(si) // sends that scheduling input into the data structure to be popped in batch to go to PV as a protobuf
 }
 
