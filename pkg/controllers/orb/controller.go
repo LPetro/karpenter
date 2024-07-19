@@ -27,7 +27,7 @@ import (
 	"github.com/awslabs/operatorpkg/singleton"
 
 	"google.golang.org/protobuf/proto"
-	// proto "github.com/gogo/protobuf/proto"
+	// proto "github.com/gogo/protobuf/proto" // This one is outdated and causes errors in serialization process
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -52,12 +52,10 @@ type Controller struct {
 	shouldRebaseline       bool                    // Whether or not we should rebaseline (when the threshold is crossed)
 }
 
-// TODO: add struct elements and their instantiations, when defined
 func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataHeap *SchedulingMetadataHeap) *Controller {
 	return &Controller{
 		schedulingInputHeap:    schedulingInputHeap,
 		schedulingMetadataHeap: schedulingMetadataHeap,
-		mostRecentBaseline:     nil,
 		shouldRebaseline:       true,
 		rebaselineThreshold:    initialDeltaThreshold,
 	}
@@ -95,10 +93,8 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 }
 
 func (c *Controller) logSchedulingInputsToPV() error {
-	// Pop each scheduling input off my heap (oldest first) and batch log in PV
-	for c.schedulingInputHeap.Len() > 0 {
+	for c.schedulingInputHeap.Len() > 0 { // Pop each scheduling input off my heap (oldest first) and batch log in PV
 		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput)
-		inputDiffAdded, inputDiffRemoved, inputDiffChanged := &SchedulingInput{}, &SchedulingInput{}, &SchedulingInput{}
 
 		// Set the baseline on initial input or upon rebaselining
 		if c.mostRecentBaseline == nil || c.shouldRebaseline {
@@ -110,7 +106,7 @@ func (c *Controller) logSchedulingInputsToPV() error {
 			c.shouldRebaseline = false
 			c.mostRecentBaseline = &currentInput
 		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
-			inputDiffAdded, inputDiffRemoved, inputDiffChanged = currentInput.Diff(c.mostRecentBaseline)
+			inputDiffAdded, inputDiffRemoved, inputDiffChanged := currentInput.Diff(c.mostRecentBaseline)
 			err := c.logSchedulingDifferencesToPV(inputDiffAdded, inputDiffRemoved, inputDiffChanged, currentInput.Timestamp)
 			if err != nil {
 				fmt.Println("Error saving differences to PV:", err)

@@ -45,11 +45,11 @@ type SchedulingInput struct {
 }
 
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
-	pendingPods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes []*cloudprovider.InstanceType) SchedulingInput {
-	return SchedulingInput{
+	pendingPods []*v1.Pod, stateNodes []*state.StateNode, instanceTypes []*cloudprovider.InstanceType) *SchedulingInput {
+	return &SchedulingInput{
 		Timestamp:          scheduledTime,
 		PendingPods:        pendingPods,
-		StateNodesWithPods: getStateNodesWithPods(ctx, kubeClient, stateNodes),
+		StateNodesWithPods: newStateNodesWithPods(ctx, kubeClient, stateNodes),
 		InstanceTypes:      instanceTypes,
 	}
 }
@@ -61,27 +61,21 @@ type StateNodeWithPods struct {
 	Pods      []*v1.Pod
 }
 
-func getStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
+func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
 	stateNodesWithPods := []*StateNodeWithPods{}
-	stateNodes = reduceStateNodes(stateNodes)
+	for _, stateNode := range reduceStateNodes(stateNodes) {
+		pods, err := stateNode.Pods(ctx, kubeClient)
+		if err != nil {
+			pods = nil
+		}
 
-	for _, stateNode := range stateNodes {
-		stateNodesWithPods = append(stateNodesWithPods, getStateNodeWithPods(ctx, kubeClient, stateNode))
+		stateNodesWithPods = append(stateNodesWithPods, &StateNodeWithPods{
+			Node:      stateNode.Node,
+			NodeClaim: stateNode.NodeClaim,
+			Pods:      reducePods(pods),
+		})
 	}
 	return stateNodesWithPods
-}
-
-func getStateNodeWithPods(ctx context.Context, kubeClient client.Client, stateNode *state.StateNode) *StateNodeWithPods {
-	pods, err := stateNode.Pods(ctx, kubeClient)
-	if err != nil {
-		pods = nil
-	}
-
-	return &StateNodeWithPods{
-		Node:      stateNode.Node,
-		NodeClaim: stateNode.NodeClaim,
-		Pods:      pods,
-	}
 }
 
 func (snp StateNodeWithPods) GetName() string {
@@ -91,14 +85,11 @@ func (snp StateNodeWithPods) GetName() string {
 	return snp.Node.GetName()
 }
 
-// Reduce the Scheduling Input down to what's minimally required for re-simulation
-func (si SchedulingInput) Reduce() SchedulingInput {
-	return SchedulingInput{
-		Timestamp:          si.Timestamp,
-		PendingPods:        reducePods(si.PendingPods),
-		StateNodesWithPods: si.StateNodesWithPods,
-		InstanceTypes:      reduceInstanceTypes(si.InstanceTypes),
-	}
+// Reduce the Scheduling Input down to what's minimally required for re-simulation, in place
+func (si *SchedulingInput) Reduce() {
+	si.PendingPods = reducePods(si.PendingPods)
+	// StateNodesWithPods are constructed with their StateNodes and Pods reduced
+	si.InstanceTypes = reduceInstanceTypes(si.InstanceTypes)
 }
 
 // TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures

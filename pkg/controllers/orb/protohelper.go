@@ -54,7 +54,6 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 
 func protoPods(pods []*v1.Pod) []*pb.ReducedPod {
 	reducedPods := []*pb.ReducedPod{}
-
 	for _, pod := range pods {
 		reducedPod := &pb.ReducedPod{
 			Name:      pod.Name,
@@ -63,13 +62,11 @@ func protoPods(pods []*v1.Pod) []*pb.ReducedPod {
 		}
 		reducedPods = append(reducedPods, reducedPod)
 	}
-
 	return reducedPods
 }
 
 func reconstructPods(reducedPods []*pb.ReducedPod) []*v1.Pod {
 	pods := []*v1.Pod{}
-
 	for _, reducedPod := range reducedPods {
 		pods = append(pods, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -81,7 +78,6 @@ func reconstructPods(reducedPods []*pb.ReducedPod) []*v1.Pod {
 			},
 		})
 	}
-
 	return pods
 }
 
@@ -93,26 +89,28 @@ func protoNode(node *v1.Node) *pb.StateNodeWithPods_ReducedNode {
 	if err != nil {
 		return nil
 	}
-	// Create a new instance of the reduced node type
-	reducedNode := &pb.StateNodeWithPods_ReducedNode{
+
+	return &pb.StateNodeWithPods_ReducedNode{
 		Name:       node.Name,
 		Nodestatus: nodeStatus,
 	}
-	return reducedNode
 }
 
 func reconstructNode(nodeData *pb.StateNodeWithPods_ReducedNode) *v1.Node {
 	if nodeData == nil {
 		return nil
 	}
-	node := &v1.Node{}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeData.Name,
+		},
+	}
 	node.Status.Unmarshal(nodeData.Nodestatus)
 	return node
 }
 
 func protoStateNodesWithPods(stateNodesWithPods []*StateNodeWithPods) []*pb.StateNodeWithPods {
 	snpData := []*pb.StateNodeWithPods{}
-
 	for _, snp := range stateNodesWithPods {
 		var nodeClaim *pb.StateNodeWithPods_ReducedNodeClaim
 		if snp.NodeClaim != nil {
@@ -126,13 +124,11 @@ func protoStateNodesWithPods(stateNodesWithPods []*StateNodeWithPods) []*pb.Stat
 			Pods:      protoPods(snp.Pods),
 		})
 	}
-
 	return snpData
 }
 
 func reconstructStateNodesWithPods(snpData []*pb.StateNodeWithPods) []*StateNodeWithPods {
 	stateNodesWithPods := []*StateNodeWithPods{}
-
 	for _, snpData := range snpData {
 		var nodeClaim *v1beta1.NodeClaim
 		if snpData.NodeClaim != nil {
@@ -148,13 +144,11 @@ func reconstructStateNodesWithPods(snpData []*pb.StateNodeWithPods) []*StateNode
 			Pods:      reconstructPods(snpData.Pods),
 		})
 	}
-
 	return stateNodesWithPods
 }
 
 func protoInstanceTypes(instanceTypes []*cloudprovider.InstanceType) []*pb.ReducedInstanceType {
 	itData := []*pb.ReducedInstanceType{}
-
 	for _, it := range instanceTypes {
 		itData = append(itData, &pb.ReducedInstanceType{
 			Name:         it.Name,
@@ -162,13 +156,11 @@ func protoInstanceTypes(instanceTypes []*cloudprovider.InstanceType) []*pb.Reduc
 			Offerings:    protoOfferings(it.Offerings),
 		})
 	}
-
 	return itData
 }
 
 func reconstructInstanceTypes(itData []*pb.ReducedInstanceType) []*cloudprovider.InstanceType {
 	instanceTypes := []*cloudprovider.InstanceType{}
-
 	for _, it := range itData {
 		instanceTypes = append(instanceTypes, &cloudprovider.InstanceType{
 			Name:         it.Name,
@@ -176,13 +168,11 @@ func reconstructInstanceTypes(itData []*pb.ReducedInstanceType) []*cloudprovider
 			Offerings:    reconstructOfferings(it.Offerings),
 		})
 	}
-
 	return instanceTypes
 }
 
 func protoRequirements(requirements scheduling.Requirements) []*pb.ReducedInstanceType_ReducedRequirement {
 	requirementsData := []*pb.ReducedInstanceType_ReducedRequirement{}
-
 	for _, requirement := range requirements {
 		requirementsData = append(requirementsData, &pb.ReducedInstanceType_ReducedRequirement{
 			Key:                  requirement.Key,
@@ -190,13 +180,11 @@ func protoRequirements(requirements scheduling.Requirements) []*pb.ReducedInstan
 			Values:               requirement.Values(),
 		})
 	}
-
 	return requirementsData
 }
 
 func reconstructRequirements(requirementsData []*pb.ReducedInstanceType_ReducedRequirement) scheduling.Requirements {
 	requirements := scheduling.Requirements{}
-
 	for _, requirementData := range requirementsData {
 		requirements.Add(scheduling.NewRequirement(
 			requirementData.Key,
@@ -204,13 +192,11 @@ func reconstructRequirements(requirementsData []*pb.ReducedInstanceType_ReducedR
 			requirementData.Values...,
 		))
 	}
-
 	return requirements
 }
 
 func protoOfferings(offerings cloudprovider.Offerings) []*pb.ReducedInstanceType_ReducedOffering {
 	offeringsData := []*pb.ReducedInstanceType_ReducedOffering{}
-
 	for _, offering := range offerings {
 		offeringsData = append(offeringsData, &pb.ReducedInstanceType_ReducedOffering{
 			Requirements: protoRequirements(offering.Requirements),
@@ -218,13 +204,11 @@ func protoOfferings(offerings cloudprovider.Offerings) []*pb.ReducedInstanceType
 			Available:    offering.Available,
 		})
 	}
-
 	return offeringsData
 }
 
 func reconstructOfferings(offeringsData []*pb.ReducedInstanceType_ReducedOffering) cloudprovider.Offerings {
 	offerings := cloudprovider.Offerings{}
-
 	for _, offeringData := range offeringsData {
 		offerings = append(offerings, cloudprovider.Offering{
 			Requirements: reconstructRequirements(offeringData.Requirements),
@@ -232,6 +216,5 @@ func reconstructOfferings(offeringsData []*pb.ReducedInstanceType_ReducedOfferin
 			Available:    offeringData.Available,
 		})
 	}
-
 	return offerings
 }
