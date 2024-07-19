@@ -29,8 +29,8 @@ import (
 
 	"github.com/awslabs/operatorpkg/singleton"
 
-	//"google.golang.org/protobuf/proto"
-	proto "github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
+	// proto "github.com/gogo/protobuf/proto"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"

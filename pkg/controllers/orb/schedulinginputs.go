@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"time"
 
-	// "google.golang.org/protobuf/proto"
-	proto "github.com/gogo/protobuf/proto"
+	proto "google.golang.org/protobuf/proto"
+	// proto "github.com/gogo/protobuf/proto"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
