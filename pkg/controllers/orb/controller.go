@@ -18,7 +18,6 @@ package orb
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -28,11 +27,10 @@ import (
 	"github.com/awslabs/operatorpkg/singleton"
 
 	"google.golang.org/protobuf/proto"
-	// proto "github.com/gogo/protobuf/proto" // This one is outdated and causes errors in serialization process
+	// proto "github.com/gogo/protobuf/proto" // This one is outdated and causes errors in the (de/)serialization processes
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 )
 
 const ( // Constants for calculating the moving average of the rebaseline
@@ -81,6 +79,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		return reconcile.Result{}, err
 	}
 
+	// Markers for testing, delete later
 	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
 	fmt.Println()
 
@@ -132,45 +131,6 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join("/data", fileName)
 
-	// DEBUG Remove Later
-	fileNameStringtest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.log", timestampStr)
-	pathStringtest := filepath.Join("/data", fileNameStringtest)
-	file, err := os.Create(pathStringtest)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString(item.String())
-	if err != nil {
-		fmt.Println("Error writing data to file:", err)
-		return err
-	}
-	// END DEBUG Print
-
-	// DEBUG Remove Later
-	fileNameJSONtest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.json", timestampStr)
-	pathJSONtest := filepath.Join("/data", fileNameJSONtest)
-	file, err = os.Create(pathJSONtest)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
-
-	jsondata, err := json.Marshal(item)
-	if err != nil {
-		fmt.Println("Error marshalling data to JSON:", err)
-		return err
-	}
-	_, err = file.Write(jsondata)
-	if err != nil {
-		fmt.Println("Error writing data to file:", err)
-		return err
-	}
-	// END DEBUG Print
-
 	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
 }
@@ -182,7 +142,6 @@ func (c *Controller) logSchedulingDifferencesToPV(differences *SchedulingInputDi
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
 	}
-
 	c.shouldRebaseline = c.determineRebaseline(len(logdata))
 
 	timestampStr := timestamp.Format("2006-01-02_15-04-05")
@@ -204,19 +163,8 @@ func (c *Controller) logSchedulingMetadataToPV(heap *SchedulingMetadataHeap) err
 	fileName := fmt.Sprintf("SchedulingMetadata_%s_to_%s.log", oldestStr, newestStr)
 	path := filepath.Join("/data", fileName)
 
-	// Pop each scheduling metadata off its heap (oldest first) to batch log them together to PV.
-	mapping := &pb.SchedulingMetadataMap{}
-	for heap.Len() > 0 {
-		metadata := heap.Pop().(SchedulingMetadata)
-		entry := &pb.SchedulingMetadataMap_MappingEntry{
-			Action:    metadata.Action,
-			Timestamp: metadata.Timestamp.Format("2006-01-02_15-04-05"),
-		}
-		mapping.Entries = append(mapping.Entries, entry)
-	}
-
 	// Marshals the mapping
-	mappingdata, err := proto.Marshal(mapping)
+	mappingdata, err := proto.Marshal(protoSchedulingMetadataMap(heap))
 	if err != nil {
 		fmt.Println("Error marshalling data:", err)
 		return err
@@ -244,6 +192,10 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 }
 
 // Determines if we should save a new baseline Scheduling Input, using a moving-average heuristic
+// The largest portion of the SchedulingInputs are InstanceTypes, so the expectation is that a
+// rebaseline will only be triggered when InstanceType offers change. This allows for changes if
+// other underlying data changes significantly, however.
+// TODO: due to its size, track/reconstruct diffs on InstanceTypes at a lower level.
 func (c *Controller) determineRebaseline(diffSize int) bool {
 	diffSizeFloat := float32(diffSize)
 	baselineSizeFloat := float32(c.baselineSize)

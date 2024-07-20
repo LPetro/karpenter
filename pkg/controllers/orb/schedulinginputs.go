@@ -41,7 +41,7 @@ type SchedulingInput struct {
 	Timestamp          time.Time
 	PendingPods        []*v1.Pod
 	StateNodesWithPods []*StateNodeWithPods
-	Bindings           map[types.NamespacedName]string `json:"-"`
+	Bindings           map[types.NamespacedName]string
 	InstanceTypes      []*cloudprovider.InstanceType
 	// TODO: all the other scheduling inputs... (bindings?)
 }
@@ -88,17 +88,8 @@ func (si *SchedulingInput) Reduce() {
 	si.InstanceTypes = reduceInstanceTypes(si.InstanceTypes)
 }
 
-// TODO: I need to flip the construct here. I should be generating some stripped/minimal subset of these data structures
-// which are already the representation that I'd like to print. i.e. store in memory only what I want to print anyway
 func (si SchedulingInput) String() string {
 	return protoSchedulingInput(&si).String()
-	// return fmt.Sprintf("Timestamp (UTC): %v\n\nPendingPods:\n%v\n\nStateNodesWithPods:\n%v\n\nBindings:\n%v\n\nInstanceTypes:\n%v\n\n",
-	// 	si.Timestamp.Format("2006-01-02_15-04-05"),
-	// 	PodsToString(si.PendingPods),
-	// 	StateNodesWithPodsToString(si.StateNodesWithPods),
-	// 	BindingsToString(si.Bindings),
-	// 	InstanceTypesToString(si.InstanceTypes),
-	// )
 }
 
 func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
