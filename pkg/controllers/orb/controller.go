@@ -73,6 +73,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		return reconcile.Result{}, err
 	}
 
+	// Log the associated scheduling action metadata
 	err = c.logSchedulingMetadataToPV(c.schedulingMetadataHeap)
 	if err != nil {
 		fmt.Println("Error writing scheduling metadata to PV:", err)
