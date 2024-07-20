@@ -18,6 +18,7 @@ package orb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -131,21 +132,44 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join("/data", fileName)
 
-	// // DEBUG Remove Later
-	// fileNametest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.log", timestampStr)
-	// pathtest := filepath.Join("/data", fileNametest)
-	// file, err := os.Create(pathtest)
-	// if err != nil {
-	// 	fmt.Println("Error opening file:", err)
-	// 	return err
-	// }
-	// defer file.Close()
+	// DEBUG Remove Later
+	fileNameStringtest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.log", timestampStr)
+	pathStringtest := filepath.Join("/data", fileNameStringtest)
+	file, err := os.Create(pathStringtest)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return err
+	}
+	defer file.Close()
 
-	// _, err = file.WriteString(item.String())
-	// if err != nil {
-	// 	fmt.Println("Error writing data to file:", err)
-	// 	return err
-	// }
+	_, err = file.WriteString(item.String())
+	if err != nil {
+		fmt.Println("Error writing data to file:", err)
+		return err
+	}
+	// END DEBUG Print
+
+	// DEBUG Remove Later
+	fileNameJSONtest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.json", timestampStr)
+	pathJSONtest := filepath.Join("/data", fileNameJSONtest)
+	file, err = os.Create(pathJSONtest)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return err
+	}
+	defer file.Close()
+
+	jsondata, err := json.Marshal(item)
+	if err != nil {
+		fmt.Println("Error marshalling data to JSON:", err)
+		return err
+	}
+	_, err = file.Write(jsondata)
+	if err != nil {
+		fmt.Println("Error writing data to file:", err)
+		return err
+	}
+	// END DEBUG Print
 
 	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)

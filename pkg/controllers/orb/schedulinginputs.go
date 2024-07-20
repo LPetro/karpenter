@@ -41,7 +41,7 @@ type SchedulingInput struct {
 	Timestamp          time.Time
 	PendingPods        []*v1.Pod
 	StateNodesWithPods []*StateNodeWithPods
-	Bindings           map[types.NamespacedName]string
+	Bindings           map[types.NamespacedName]string `json:"-"`
 	InstanceTypes      []*cloudprovider.InstanceType
 	// TODO: all the other scheduling inputs... (bindings?)
 }
