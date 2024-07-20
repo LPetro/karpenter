@@ -227,6 +227,7 @@ func protoSchedulingInput(si *SchedulingInput) *pb.SchedulingInput {
 	return &pb.SchedulingInput{
 		Timestamp:         si.Timestamp.Format("2006-01-02_15-04-05"),
 		PendingpodData:    protoPods(si.PendingPods),
+		Bindings:          protoBindings(si.Bindings),
 		StatenodesData:    protoStateNodesWithPods(si.StateNodesWithPods),
 		InstancetypesData: protoInstanceTypes(si.InstanceTypes),
 	}
