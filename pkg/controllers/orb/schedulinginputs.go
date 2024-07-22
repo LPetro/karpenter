@@ -65,7 +65,7 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 	}
 }
 
-func NewSchedulingInputReconstruct(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods,
+func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods,
 	bindings map[types.NamespacedName]string, instanceTypes []*cloudprovider.InstanceType) *SchedulingInput {
 	return &SchedulingInput{
 		Timestamp:          timestamp,
@@ -84,8 +84,8 @@ func (snp StateNodeWithPods) GetName() string {
 }
 
 func (si *SchedulingInput) Reduce() {
-	si.PendingPods = reducePods(si.PendingPods)
-	si.InstanceTypes = reduceInstanceTypes(si.InstanceTypes)
+	si.PendingPods = ReducePods(si.PendingPods)
+	si.InstanceTypes = ReduceInstanceTypes(si.InstanceTypes)
 }
 
 func (si SchedulingInput) String() string {
@@ -103,7 +103,7 @@ func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 		stateNodesWithPods = append(stateNodesWithPods, &StateNodeWithPods{
 			Node:      stateNode.Node,
 			NodeClaim: stateNode.NodeClaim,
-			Pods:      reducePods(pods),
+			Pods:      ReducePods(pods),
 		})
 	}
 	return stateNodesWithPods
@@ -111,7 +111,7 @@ func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 
 /* Functions to reduce resources in Scheduling Inputs to the constituent parts we care to log / introspect */
 
-func reducePods(pods []*v1.Pod) []*v1.Pod {
+func ReducePods(pods []*v1.Pod) []*v1.Pod {
 	reducedPods := []*v1.Pod{}
 	for _, pod := range pods {
 		reducedPod := &v1.Pod{
@@ -198,7 +198,7 @@ func reduceRequirements(requirements scheduling.Requirements) scheduling.Require
 	return reducedRequirements
 }
 
-func reduceInstanceTypes(its []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
+func ReduceInstanceTypes(its []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
 	reducedInstanceTypes := []*cloudprovider.InstanceType{}
 	for _, it := range its {
 		reducedInstanceType := &cloudprovider.InstanceType{
@@ -248,7 +248,7 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		return nil, fmt.Errorf("failed to parse timestamp: %v", err)
 	}
 
-	return NewSchedulingInputReconstruct(
+	return NewReconstructedSchedulingInput(
 		timestamp,
 		reconstructPods(pbsi.GetPendingpodData()),
 		reconstructStateNodesWithPods(pbsi.GetStatenodesData()),

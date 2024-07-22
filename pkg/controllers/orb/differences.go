@@ -99,15 +99,15 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferen
 
 	// If there are added differences, include them
 	if len(podDiff.Added) > 0 || len(snpDiff.Added) > 0 || len(bindingsDiff.Added) > 0 || len(itDiff.Added) > 0 {
-		diffAdded = NewSchedulingInputReconstruct(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added)
+		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added)
 		fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
 	}
 	if len(podDiff.Removed) > 0 || len(snpDiff.Removed) > 0 || len(bindingsDiff.Removed) > 0 || len(itDiff.Removed) > 0 {
-		diffRemoved = NewSchedulingInputReconstruct(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed)
+		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed)
 		fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
 	}
 	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 {
-		diffChanged = NewSchedulingInputReconstruct(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed)
+		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed)
 		fmt.Println("Diff Scheduling Input changed is... ", diffChanged.String()) // Test print, delete later
 	}
 
