@@ -164,6 +164,28 @@ func crossSection(differences []*SchedulingInputDifferences) ([]*SchedulingInput
 	return allAdded, allRemoved, allChanged
 }
 
+// Get the byte size of the cross-section of differences to compare for rebaselining
+func (differences *SchedulingInputDifferences) getByteSize() int {
+	protoAdded := protoSchedulingInput(differences.Added)
+	protoRemoved := protoSchedulingInput(differences.Removed)
+	protoChanged := protoSchedulingInput(differences.Changed)
+
+	protoAddedData, err := proto.Marshal(protoAdded)
+	if err != nil {
+		protoAddedData = []byte{} // size 0
+	}
+	protoRemovedData, err := proto.Marshal(protoRemoved)
+	if err != nil {
+		protoRemovedData = []byte{} // size 0
+	}
+	protoChangedData, err := proto.Marshal(protoChanged)
+	if err != nil {
+		protoChangedData = []byte{} // size 0
+	}
+
+	return len(protoAddedData) + len(protoRemovedData) + len(protoChangedData)
+}
+
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
 func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferences {
 	// Determine the differences in each of the fields of ScheduleInput

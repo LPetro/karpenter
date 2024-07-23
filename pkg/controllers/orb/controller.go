@@ -22,7 +22,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"reflect"
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
@@ -46,7 +45,7 @@ type Controller struct {
 	schedulingInputHeap    *SchedulingInputHeap    // Batches logs of inputs to heap
 	schedulingMetadataHeap *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
 	mostRecentBaseline     *SchedulingInput        // The most recently saved baseline scheduling input
-	baselineSize           uintptr                 // The size of the currently basedlined SchedulingInput in bytes
+	baselineSize           int                     // The size of the currently basedlined SchedulingInput in bytes
 	rebaselineThreshold    float32                 // The percentage threshold (between 0 and 1)
 	deltaToBaselineAvg     float32                 // The average delta to the baseline, moving average
 	shouldRebaseline       bool                    // Whether or not we should rebaseline (when the threshold is crossed)
@@ -110,11 +109,9 @@ func (c *Controller) logSchedulingInputsToPV() error {
 			c.shouldRebaseline = false
 			c.mostRecentBaseline = &currentInput
 		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
-			inputDifferences = append(inputDifferences, currentInput.Diff(c.mostRecentBaseline))
-			c.shouldRebaseline = c.determineRebaseline(reflect.TypeOf(currentInput).Size()) // TODO: Non-ideal heuristic
-			// TODO: Because this is done within a batch, when reconstructing, we *need* to consider the timestamp of the baseline from which we're reconstructing
-			// This is because a batch of differences may not be contiguous from one specific baseline (if we ever rebaseline within a batch)
-			// We should be doing this anyway, but putting TODO here so I don't forget
+			currentDifferences := currentInput.Diff(c.mostRecentBaseline)
+			inputDifferences = append(inputDifferences, currentDifferences)
+			c.shouldRebaseline = c.determineRebaseline(currentDifferences.getByteSize())
 		}
 	}
 
@@ -123,7 +120,6 @@ func (c *Controller) logSchedulingInputsToPV() error {
 		fmt.Println("Error saving differences to PV:", err)
 		return err
 	}
-
 	return nil
 }
 
@@ -133,7 +129,7 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
 	}
-	c.baselineSize = reflect.TypeOf(item).Size()
+	c.baselineSize = len(logdata)
 
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
@@ -156,6 +152,7 @@ func (c *Controller) logSchedulingDifferencesToPV(differences []*SchedulingInput
 	}
 
 	start, end := GetTimeWindow(differences)
+
 	startTimestampStr := start.Format("2006-01-02_15-04-05")
 	endTimestampStr := end.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", startTimestampStr, endTimestampStr)
@@ -209,13 +206,13 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 // rebaseline will only be triggered when InstanceType offers change. This allows for changes if
 // other underlying data changes significantly, however.
 // TODO: due to its size, track/reconstruct diffs on InstanceTypes at a lower level.
-func (c *Controller) determineRebaseline(diffSize uintptr) bool {
+func (c *Controller) determineRebaseline(diffSize int) bool {
 	diffSizeFloat := float32(diffSize)
 	baselineSizeFloat := float32(c.baselineSize)
 
 	// If differences' size exceeds threshold percentage, rebaseline and update moving average
 	if diffSizeFloat > c.rebaselineThreshold*baselineSizeFloat {
-		c.baselineSize = reflect.TypeOf(diffSize).Size()
+		c.baselineSize = diffSize
 		c.deltaToBaselineAvg = float32(diffSize) / baselineSizeFloat
 		return true
 	}
