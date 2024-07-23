@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -50,42 +51,120 @@ type InstanceTypeDifferences struct {
 	Added, Removed, Changed []*cloudprovider.InstanceType
 }
 
-func MarshalDifferences(differences *SchedulingInputDifferences) ([]byte, error) {
-	return proto.Marshal(&pb.Differences{
-		Added:   protoSchedulingInput(differences.Added),
-		Removed: protoSchedulingInput(differences.Removed),
-		Changed: protoSchedulingInput(differences.Changed),
-	})
+func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
+	protoAdded, protoRemoved, protoChanged := crossSection(batchedDifferences)
+	protoDifferences := &pb.BatchedDifferences{
+		Added:   protoSchedulingInputs(protoAdded),
+		Removed: protoSchedulingInputs(protoRemoved),
+		Changed: protoSchedulingInputs(protoChanged),
+	}
+	protoData, err := proto.Marshal(protoDifferences)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal Differences: %v", err)
+	}
+	return protoData, nil
 }
 
-func UnmarshalDifferences(differencesData []byte) (*SchedulingInputDifferences, error) {
-	differences := &pb.Differences{}
-
-	if err := proto.Unmarshal(differencesData, differences); err != nil {
+func UnmarshalBatchedDifferences(differencesData []byte) ([]*SchedulingInputDifferences, error) {
+	batchedDifferences := &pb.BatchedDifferences{}
+	if err := proto.Unmarshal(differencesData, batchedDifferences); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal Differences: %v", err)
 	}
 
-	added, err := reconstructSchedulingInput(differences.GetAdded())
+	batchedAdded, err := reconstructSchedulingInputs(batchedDifferences.GetAdded())
 	if err != nil {
 		return nil, fmt.Errorf("failed to reconstruct Added: %v", err)
 	}
-	removed, err := reconstructSchedulingInput(differences.GetRemoved())
+	batchedRemoved, err := reconstructSchedulingInputs(batchedDifferences.GetRemoved())
 	if err != nil {
 		return nil, fmt.Errorf("failed to reconstruct Removed: %v", err)
 	}
-	changed, err := reconstructSchedulingInput(differences.GetChanged())
+	batchedChanged, err := reconstructSchedulingInputs(batchedDifferences.GetChanged())
 	if err != nil {
 		return nil, fmt.Errorf("failed to reconstruct Changed: %v", err)
 	}
-	return &SchedulingInputDifferences{
-		Added:   added,
-		Removed: removed,
-		Changed: changed,
-	}, nil
+
+	batchedSchedulingInputDifferences := []*SchedulingInputDifferences{}
+	for i := 0; i < len(batchedAdded); i++ { // They should have the same dimensionality, even if some are empty
+		batchedSchedulingInputDifferences = append(batchedSchedulingInputDifferences, &SchedulingInputDifferences{
+			Added:   batchedAdded[i],
+			Removed: batchedRemoved[i],
+			Changed: batchedChanged[i],
+		})
+	}
+
+	return batchedSchedulingInputDifferences, nil
+}
+
+func protoSchedulingInputs(si []*SchedulingInput) []*pb.SchedulingInput {
+	protoSi := []*pb.SchedulingInput{}
+	for _, schedulingInput := range si {
+		protoSi = append(protoSi, protoSchedulingInput(schedulingInput))
+	}
+	return protoSi
+}
+
+func reconstructSchedulingInputs(pbsi []*pb.SchedulingInput) ([]*SchedulingInput, error) {
+	reconstructedSi := []*SchedulingInput{}
+	for _, schedulingInput := range pbsi {
+		si, err := reconstructSchedulingInput(schedulingInput)
+		if err != nil {
+			return nil, err
+		}
+		reconstructedSi = append(reconstructedSi, si)
+	}
+	return reconstructedSi, nil
+}
+
+// Retrieves the time from any non-empty scheduling input in differences. The times are equivalent between them.
+func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
+	if differences.Added != nil && !differences.Added.Timestamp.IsZero() {
+		return differences.Added.Timestamp
+	} else if differences.Removed != nil && !differences.Removed.Timestamp.IsZero() {
+		return differences.Removed.Timestamp
+	} else if differences.Changed != nil && !differences.Changed.Timestamp.IsZero() {
+		return differences.Changed.Timestamp
+	}
+	return time.Time{} // Return the zero value of time.Time if no timestamp is found
+}
+
+// Gets the time window (i.e. from start to end timestamp) from a slice of differences. It returns (start, end)
+func GetTimeWindow(differences []*SchedulingInputDifferences) (time.Time, time.Time) {
+	start := time.Now().UTC()
+	end := time.Time{}.UTC()
+	for _, diff := range differences {
+		timestamp := diff.GetTimestamp()
+		if timestamp.Before(start) {
+			start = timestamp
+		}
+		if timestamp.After(end) {
+			end = timestamp
+		}
+	}
+	return start, end
+}
+
+// Pulls the cross-sectional slices of each Scheduling Input differences from a slice of Differences
+func crossSection(differences []*SchedulingInputDifferences) ([]*SchedulingInput, []*SchedulingInput, []*SchedulingInput) {
+	allAdded := []*SchedulingInput{}
+	allRemoved := []*SchedulingInput{}
+	allChanged := []*SchedulingInput{}
+
+	for _, diff := range differences {
+		if diff.Added != nil {
+			allAdded = append(allAdded, diff.Added)
+		}
+		if diff.Removed != nil {
+			allRemoved = append(allRemoved, diff.Removed)
+		}
+		if diff.Changed != nil {
+			allChanged = append(allChanged, diff.Changed)
+		}
+	}
+	return allAdded, allRemoved, allChanged
 }
 
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
-// TODO: Emptiness checking could be improved, so a lone Timestamp doesn't get logged.
 func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferences {
 	// Determine the differences in each of the fields of ScheduleInput
 	podDiff := diffPods(oldSi.PendingPods, si.PendingPods)
@@ -126,7 +205,7 @@ func diffPods(oldPods, newPods []*v1.Pod) PodDifferences {
 		Changed: []*v1.Pod{},
 	}
 
-	// Reference each pod by its UID
+	// Cast pod slices to sets for unordered reference by their UID
 	oldPodSet := map[string]*v1.Pod{}
 	for _, pod := range oldPods {
 		oldPodSet[string(pod.GetUID())] = pod
@@ -143,7 +222,7 @@ func diffPods(oldPods, newPods []*v1.Pod) PodDifferences {
 
 		if !exists {
 			diff.Added = append(diff.Added, newPod)
-		} else if hasPodChanged(oldPod, newPod) {
+		} else if hasReducedPodChanged(oldPod, newPod) {
 			// If pod has changed, add the whole changed pod
 			// Simplification / Opportunity to optimize -- Only add sub-field.
 			//    This requires more book-keeping on object reconstruction from logs later on.
@@ -169,7 +248,7 @@ func diffStateNodes(oldStateNodesWithPods, newStateNodesWithPods []*StateNodeWit
 		Changed: []*StateNodeWithPods{},
 	}
 
-	// Reference StateNodesWithPods by its name
+	// Cast StateNodesWithPods slices to sets for unordered reference by their name
 	oldStateNodeSet := map[string]*StateNodeWithPods{}
 	for _, stateNodeWithPods := range oldStateNodesWithPods {
 		oldStateNodeSet[stateNodeWithPods.GetName()] = stateNodeWithPods
@@ -237,7 +316,7 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 		Changed: []*cloudprovider.InstanceType{},
 	}
 
-	// Reference InstanceTypes by their Name
+	// Cast InstanceTypes slices to sets for unordered reference by their Name
 	oldTypeSet := map[string]*cloudprovider.InstanceType{}
 	for _, instanceType := range oldTypes {
 		oldTypeSet[instanceType.Name] = instanceType
@@ -254,7 +333,7 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 
 		if !exists {
 			diff.Added = append(diff.Added, newType)
-		} else if hasInstanceTypeChanged(oldType, newType) {
+		} else if hasReducedInstanceTypeChanged(oldType, newType) {
 			diff.Changed = append(diff.Changed, newType)
 		}
 	}
@@ -269,21 +348,20 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 	return diff
 }
 
-// TODO: change these to checking only reduced-fields, so that DeepEqual isn't required.
-// Maybe just proto it and check proto.Equal because that already reduces it to those fields.
-func hasPodChanged(oldPod, newPod *v1.Pod) bool {
-	return !equality.Semantic.DeepEqual(oldPod, newPod)
+func hasReducedPodChanged(oldPod, newPod *v1.Pod) bool {
+	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta, newPod.ObjectMeta) ||
+		!equality.Semantic.DeepEqual(oldPod.Status, newPod.Status) ||
+		!equality.Semantic.DeepEqual(oldPod.Spec, newPod.Spec)
 }
 
 func hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods *StateNodeWithPods) bool {
 	return !equality.Semantic.DeepEqual(oldStateNodeWithPods, newStateNodeWithPods)
 }
 
-// Checking equality on only fields I've reduced it to (i.e. Name Requirements Offerings)
-func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
+func hasReducedInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
 	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name) ||
 		!structEqualJSON(oldInstanceType.Offerings, newInstanceType.Offerings) || // Cannot deep equal these, they have unexported types
-		!structEqualJSON(oldInstanceType.Requirements, newInstanceType.Requirements)
+		!structEqualJSON(oldInstanceType.Requirements, newInstanceType.Requirements) // ^
 }
 
 // TODO: Likely inefficient equality checking for nested types Offerings and Requirements,

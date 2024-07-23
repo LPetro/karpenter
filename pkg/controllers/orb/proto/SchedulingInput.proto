@@ -6,10 +6,10 @@ option go_package = "sigs.k8s.io/karpenter/pkg/controllers/orb/proto";
 //   repeated Differences differences = 1;
 // }
 
-message Differences {
-  optional SchedulingInput added = 1;
-  optional SchedulingInput removed = 2;
-  optional SchedulingInput changed = 3;
+message BatchedDifferences {
+  repeated SchedulingInput added = 1;
+  repeated SchedulingInput removed = 2;
+  repeated SchedulingInput changed = 3;
 }
 
 // TODO: will need to be updated as I continue to update SchedulingInput

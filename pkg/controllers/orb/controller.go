@@ -22,6 +22,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
@@ -45,7 +46,7 @@ type Controller struct {
 	schedulingInputHeap    *SchedulingInputHeap    // Batches logs of inputs to heap
 	schedulingMetadataHeap *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
 	mostRecentBaseline     *SchedulingInput        // The most recently saved baseline scheduling input
-	baselineSize           int                     // The size of the currently basedlined SchedulingInput in bytes
+	baselineSize           uintptr                 // The size of the currently basedlined SchedulingInput in bytes
 	rebaselineThreshold    float32                 // The percentage threshold (between 0 and 1)
 	deltaToBaselineAvg     float32                 // The average delta to the baseline, moving average
 	shouldRebaseline       bool                    // Whether or not we should rebaseline (when the threshold is crossed)
@@ -95,6 +96,7 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 
 // Logs the scheduling inputs from the heap as either a baseline or differences
 func (c *Controller) logSchedulingInputsToPV() error {
+	inputDifferences := []*SchedulingInputDifferences{}
 	for c.schedulingInputHeap.Len() > 0 {
 		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput)
 
@@ -107,15 +109,21 @@ func (c *Controller) logSchedulingInputsToPV() error {
 			}
 			c.shouldRebaseline = false
 			c.mostRecentBaseline = &currentInput
-		} else { // Check if the scheduling inputs have changed since the last time we saved it to PV
-			inputDifferences := currentInput.Diff(c.mostRecentBaseline)
-			err := c.logSchedulingDifferencesToPV(inputDifferences, currentInput.Timestamp)
-			if err != nil {
-				fmt.Println("Error saving differences to PV:", err)
-				return err
-			}
+		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
+			inputDifferences = append(inputDifferences, currentInput.Diff(c.mostRecentBaseline))
+			c.shouldRebaseline = c.determineRebaseline(reflect.TypeOf(currentInput).Size()) // TODO: Non-ideal heuristic
+			// TODO: Because this is done within a batch, when reconstructing, we *need* to consider the timestamp of the baseline from which we're reconstructing
+			// This is because a batch of differences may not be contiguous from one specific baseline (if we ever rebaseline within a batch)
+			// We should be doing this anyway, but putting TODO here so I don't forget
 		}
 	}
+
+	err := c.logSchedulingDifferencesToPV(inputDifferences)
+	if err != nil {
+		fmt.Println("Error saving differences to PV:", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -125,7 +133,7 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
 	}
-	c.baselineSize = len(logdata)
+	c.baselineSize = reflect.TypeOf(item).Size()
 
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
@@ -136,16 +144,21 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 }
 
 // TODO: Eventually merge these individual difference prints to all the differences within a batch (similar to metadata)
-func (c *Controller) logSchedulingDifferencesToPV(differences *SchedulingInputDifferences, timestamp time.Time) error {
-	logdata, err := MarshalDifferences(differences)
+func (c *Controller) logSchedulingDifferencesToPV(differences []*SchedulingInputDifferences) error {
+	if len(differences) == 0 {
+		return nil // Nothing to log.
+	}
+
+	logdata, err := MarshalBatchedDifferences(differences)
 	if err != nil {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
 	}
-	c.shouldRebaseline = c.determineRebaseline(len(logdata))
 
-	timestampStr := timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingInputDifferences_%s.log", timestampStr)
+	start, end := GetTimeWindow(differences)
+	startTimestampStr := start.Format("2006-01-02_15-04-05")
+	endTimestampStr := end.Format("2006-01-02_15-04-05")
+	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", startTimestampStr, endTimestampStr)
 	path := filepath.Join("/data", fileName)
 
 	fmt.Println("Writing differences data to S3 bucket.") // test print / remove later
@@ -196,7 +209,7 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 // rebaseline will only be triggered when InstanceType offers change. This allows for changes if
 // other underlying data changes significantly, however.
 // TODO: due to its size, track/reconstruct diffs on InstanceTypes at a lower level.
-func (c *Controller) determineRebaseline(diffSize int) bool {
+func (c *Controller) determineRebaseline(diffSize uintptr) bool {
 	diffSizeFloat := float32(diffSize)
 	baselineSizeFloat := float32(c.baselineSize)
 

@@ -22,8 +22,8 @@ import (
 	"time"
 
 	proto "google.golang.org/protobuf/proto"
-	// proto "github.com/gogo/protobuf/proto"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,8 +32,6 @@ import (
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/scheduling"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 // These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
@@ -43,7 +41,6 @@ type SchedulingInput struct {
 	StateNodesWithPods []*StateNodeWithPods
 	Bindings           map[types.NamespacedName]string
 	InstanceTypes      []*cloudprovider.InstanceType
-	// TODO: all the other scheduling inputs... (bindings?)
 }
 
 // A stateNode with the Pods it has on it.
