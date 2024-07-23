@@ -20,11 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"google.golang.org/protobuf/proto"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 
@@ -164,6 +167,32 @@ func crossSection(differences []*SchedulingInputDifferences) ([]*SchedulingInput
 	return allAdded, allRemoved, allChanged
 }
 
+// Pulls a cross-section maps of each Scheduling Input differences mapped by their timestamp,
+// returned alongside the corresponding sorted slice of times for that batch, from oldest to most recent.
+func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[time.Time]*SchedulingInput, map[time.Time]*SchedulingInput, map[time.Time]*SchedulingInput, []time.Time) {
+	allAdded := map[time.Time]*SchedulingInput{}
+	allRemoved := map[time.Time]*SchedulingInput{}
+	allChanged := map[time.Time]*SchedulingInput{}
+	batchedTimes := []time.Time{}
+
+	for _, diff := range differences {
+		if diff.Added != nil && !diff.Added.Timestamp.IsZero() {
+			allAdded[diff.Added.Timestamp] = diff.Added
+		}
+		if diff.Removed != nil && !diff.Removed.Timestamp.IsZero() {
+			allRemoved[diff.Removed.Timestamp] = diff.Removed
+		}
+		if diff.Changed != nil && !diff.Changed.Timestamp.IsZero() {
+			allChanged[diff.Changed.Timestamp] = diff.Changed
+		}
+		batchedTimes = append(batchedTimes, diff.GetTimestamp())
+	}
+
+	sort.Slice(batchedTimes, func(i, j int) bool { return batchedTimes[i].Before(batchedTimes[j]) })
+
+	return allAdded, allRemoved, allChanged, batchedTimes
+}
+
 // Get the byte size of the cross-section of differences to compare for rebaselining
 func (differences *SchedulingInputDifferences) getByteSize() int {
 	protoAdded := protoSchedulingInput(differences.Added)
@@ -184,6 +213,157 @@ func (differences *SchedulingInputDifferences) getByteSize() int {
 	}
 
 	return len(protoAddedData) + len(protoRemovedData) + len(protoChangedData)
+}
+
+// Function to merge differences read (back from the PV) to the baseline. They'll be read back and saved as a []*SchedulingInputDifferences
+// This function will need to extract the cross sections, take in a baseline *SchedulingInput and add the consolidatedAdded, conslidatedDelete and consolidatedChanges
+// which are just three *SchedulingInput's themselves. You can assume and put in placeholder functions for consolidateDifferences which pulls out those three consolidations.
+func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*SchedulingInputDifferences, reconstructTime time.Time) *SchedulingInput {
+	// Extract the cross sections mapped by their timestamps
+	batchedAdded, batchedRemoved, batchedChanged, sortedBatchedTimes := crossSectionByTimestamp(batchedDifferences)
+
+	mergedInputs := &SchedulingInput{
+		Timestamp:          reconstructTime,
+		PendingPods:        baseline.PendingPods,
+		StateNodesWithPods: baseline.StateNodesWithPods,
+		Bindings:           baseline.Bindings,
+		InstanceTypes:      baseline.InstanceTypes,
+	}
+
+	// Iterate over the baseline, making each time's set of changes
+	for _, time := range sortedBatchedTimes {
+		// Stop if we've gotten to differences occuring after the time for when we're reconstructing.
+		if reconstructTime.Before(time) {
+			break
+		}
+
+		// Merge the cross sections with the baseline
+		mergeSchedulingInputs(mergedInputs, &SchedulingInputDifferences{
+			Added:   batchedAdded[time],
+			Removed: batchedRemoved[time],
+			Changed: batchedChanged[time],
+		})
+	}
+	return mergedInputs
+}
+
+// Merge SchedulingInputs function takes in those consolidations and the baseline and returns the merged schedulingInput reconstructed
+// Merging is adding, removing and changing each field as appropriate. Since a given time cross-section's changes are mutually exclusive
+// with each other (you won't have a removal for the same pod you just added), we can apply these as is.
+func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *SchedulingInputDifferences) {
+	iteratingInput.PendingPods = mergePods(iteratingInput.PendingPods, differences)
+	iteratingInput.StateNodesWithPods = mergeStateNodesWithPods(iteratingInput.StateNodesWithPods, differences)
+	mergeBindings(iteratingInput.Bindings, differences) // Already a map, so can merge in place
+	iteratingInput.InstanceTypes = mergeInstanceTypes(iteratingInput.InstanceTypes, differences)
+}
+
+// TODO: Generalize the functions below to some interface mapping or "lo"-based helper.
+
+// Merge one time's set of differences over the baseline input or its merging iterant.
+func mergePods(iteratingPods []*v1.Pod, differences *SchedulingInputDifferences) []*v1.Pod {
+	iteratingPodMap := mapPodsByUID(iteratingPods)
+
+	// Add, remove and change pods from the iterating pods
+	if differences.Added != nil && !differences.Added.isEmpty() {
+		for _, addingPod := range differences.Added.PendingPods {
+			iteratingPodMap[addingPod.GetUID()] = addingPod
+		}
+	}
+	if differences.Removed != nil && !differences.Removed.isEmpty() {
+		for _, removingPod := range differences.Removed.PendingPods {
+			delete(iteratingPodMap, removingPod.GetUID())
+		}
+	}
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		for _, changingPod := range differences.Changed.PendingPods {
+			iteratingPodMap[changingPod.GetUID()] = changingPod
+		}
+	}
+
+	// Rebuild the iteratingPods slice from the podMap
+	mergedPods := []*v1.Pod{}
+	for _, pod := range iteratingPodMap {
+		mergedPods = append(mergedPods, pod)
+	}
+	return mergedPods
+}
+
+// Helper function to merge the baseline stateNodesWithPods with the set of differences.
+func mergeStateNodesWithPods(iteratingStateNodesWithPods []*StateNodeWithPods, differences *SchedulingInputDifferences) []*StateNodeWithPods {
+	iteratingStateNodesWithPodsMap := mapStateNodesWithPodsByName(iteratingStateNodesWithPods)
+
+	// Add, remove and change stateNodesWithPods from the iterating stateNodesWithPods
+	if differences.Added != nil && !differences.Added.isEmpty() {
+		for _, addingStateNodeWithPods := range differences.Added.StateNodesWithPods {
+			iteratingStateNodesWithPodsMap[addingStateNodeWithPods.GetName()] = addingStateNodeWithPods
+		}
+	}
+	if differences.Removed != nil && !differences.Removed.isEmpty() {
+		for _, removingStateNodeWithPods := range differences.Removed.StateNodesWithPods {
+			delete(iteratingStateNodesWithPodsMap, removingStateNodeWithPods.GetName())
+		}
+	}
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		for _, changingStateNodeWithPods := range differences.Changed.StateNodesWithPods {
+			iteratingStateNodesWithPodsMap[changingStateNodeWithPods.GetName()] = changingStateNodeWithPods
+		}
+	}
+
+	// Rebuild the iteratingStateNodesWithPods slice from the stateNodesWithPodsMap
+	mergedStateNodesWithPods := []*StateNodeWithPods{}
+	for _, stateNodeWithPods := range iteratingStateNodesWithPodsMap {
+		mergedStateNodesWithPods = append(mergedStateNodesWithPods, stateNodeWithPods)
+	}
+	return mergedStateNodesWithPods
+}
+
+// Merge the baseline/iterating bindings with the set of differences.
+func mergeBindings(iteratingBindings map[types.NamespacedName]string, differences *SchedulingInputDifferences) {
+	// Add, remove and change bindings from the iterating bindings
+	if differences.Added != nil && !differences.Added.isEmpty() {
+		for name, addingBinding := range differences.Added.Bindings {
+			iteratingBindings[name] = addingBinding
+		}
+	}
+	if differences.Removed != nil && !differences.Removed.isEmpty() {
+		for name := range differences.Removed.Bindings {
+			delete(iteratingBindings, name)
+		}
+	}
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		for name, changingBinding := range differences.Changed.Bindings {
+			iteratingBindings[name] = changingBinding
+		}
+	}
+}
+
+// Helper function to merge the baseline instanceTypes with the set of differences.
+func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, differences *SchedulingInputDifferences) []*cloudprovider.InstanceType {
+	iteratingInstanceTypesMap := mapInstanceTypesByName(iteratingInstanceTypes)
+
+	// Add, remove and change instanceTypes from the iterating instanceTypes
+	if differences.Added != nil && !differences.Added.isEmpty() {
+		for _, addingInstanceType := range differences.Added.InstanceTypes {
+			iteratingInstanceTypesMap[addingInstanceType.Name] = addingInstanceType
+		}
+	}
+	if differences.Removed != nil && !differences.Removed.isEmpty() {
+		for _, removingInstanceType := range differences.Removed.InstanceTypes {
+			delete(iteratingInstanceTypesMap, removingInstanceType.Name)
+		}
+	}
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		for _, changingInstanceType := range differences.Changed.InstanceTypes {
+			iteratingInstanceTypesMap[changingInstanceType.Name] = changingInstanceType
+		}
+	}
+
+	// Rebuild the iteratingInstanceTypes slice from the instanceTypesMap
+	mergedInstanceTypes := []*cloudprovider.InstanceType{}
+	for _, instanceType := range iteratingInstanceTypesMap {
+		mergedInstanceTypes = append(mergedInstanceTypes, instanceType)
+	}
+	return mergedInstanceTypes
 }
 
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
@@ -219,6 +399,18 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferen
 	}
 }
 
+// TODO: Generalize Mapping by defining a GetKey function for each resource.
+// TODO: Generalize Diff-ing by generalizing the diff functions for generic types and defining change functions generically.
+
+// Converts pod slice to a map from its UID.
+func mapPodsByUID(pods []*v1.Pod) map[types.UID]*v1.Pod {
+	podMap := map[types.UID]*v1.Pod{}
+	for _, pod := range pods {
+		podMap[pod.GetUID()] = pod
+	}
+	return podMap
+}
+
 // This is the diffPods function which gets the differences between pods
 func diffPods(oldPods, newPods []*v1.Pod) PodDifferences {
 	diff := PodDifferences{
@@ -227,39 +419,37 @@ func diffPods(oldPods, newPods []*v1.Pod) PodDifferences {
 		Changed: []*v1.Pod{},
 	}
 
-	// Cast pod slices to sets for unordered reference by their UID
-	oldPodSet := map[string]*v1.Pod{}
-	for _, pod := range oldPods {
-		oldPodSet[string(pod.GetUID())] = pod
+	oldPodMap := mapPodsByUID(oldPods)
+	oldPodSet := sets.KeySet(oldPodMap)
+	newPodMap := mapPodsByUID(newPods)
+	newPodSet := sets.KeySet(newPodMap)
+
+	// Add the new pods to Pod Differences
+	for addedUID := range newPodSet.Difference(oldPodSet) {
+		diff.Added = append(diff.Added, newPodMap[addedUID])
 	}
-
-	newPodSet := map[string]*v1.Pod{}
-	for _, pod := range newPods {
-		newPodSet[string(pod.GetUID())] = pod
+	// Add the removed pods to Pod Differences
+	for removedUID := range oldPodSet.Difference(newPodSet) {
+		diff.Removed = append(diff.Removed, oldPodMap[removedUID])
 	}
-
-	// Find the added and changed pods
-	for _, newPod := range newPods {
-		oldPod, exists := oldPodSet[string(newPod.GetUID())]
-
-		if !exists {
-			diff.Added = append(diff.Added, newPod)
-		} else if hasReducedPodChanged(oldPod, newPod) {
-			// If pod has changed, add the whole changed pod
-			// Simplification / Opportunity to optimize -- Only add sub-field.
-			//    This requires more book-keeping on object reconstruction from logs later on.
-			diff.Changed = append(diff.Changed, newPod)
+	// Add the changed pods to Pod Differences, only after checking if they've changed.
+	// Simplification / Opportunity to optimize -- Only add sub-field.
+	//    This requires more book-keeping on object reconstruction from logs later on.
+	for commonUID := range newPodSet.Intersection(oldPodSet) {
+		if hasReducedPodChanged(oldPodMap[commonUID], newPodMap[commonUID]) {
+			diff.Changed = append(diff.Changed, newPodMap[commonUID])
 		}
 	}
-
-	// Find the removed pods
-	for _, oldPod := range oldPods {
-		if _, exists := newPodSet[string(oldPod.GetUID())]; !exists {
-			diff.Removed = append(diff.Removed, oldPod)
-		}
-	}
-
 	return diff
+}
+
+// Function from StateNodeWithPods slice to Map by name
+func mapStateNodesWithPodsByName(stateNodesWithPods []*StateNodeWithPods) map[string]*StateNodeWithPods {
+	snpMap := map[string]*StateNodeWithPods{}
+	for _, snp := range stateNodesWithPods {
+		snpMap[snp.GetName()] = snp
+	}
+	return snpMap
 }
 
 // This is the diffStateNodes function which gets the differences between statenodes
@@ -271,34 +461,23 @@ func diffStateNodes(oldStateNodesWithPods, newStateNodesWithPods []*StateNodeWit
 	}
 
 	// Cast StateNodesWithPods slices to sets for unordered reference by their name
-	oldStateNodeSet := map[string]*StateNodeWithPods{}
-	for _, stateNodeWithPods := range oldStateNodesWithPods {
-		oldStateNodeSet[stateNodeWithPods.GetName()] = stateNodeWithPods
+	oldStateNodeMap := mapStateNodesWithPodsByName(oldStateNodesWithPods)
+	oldStateNodeSet := sets.KeySet(oldStateNodeMap)
+	newStateNodeMap := mapStateNodesWithPodsByName(newStateNodesWithPods)
+	newStateNodeSet := sets.KeySet(newStateNodeMap)
+
+	// Find the added, removed and changed stateNodes
+	for addedName := range newStateNodeSet.Difference(oldStateNodeSet) {
+		diff.Added = append(diff.Added, newStateNodeMap[addedName])
 	}
-
-	newStateNodeSet := map[string]*StateNodeWithPods{}
-	for _, stateNodeWithPods := range newStateNodesWithPods {
-		newStateNodeSet[stateNodeWithPods.GetName()] = stateNodeWithPods
+	for removedName := range oldStateNodeSet.Difference(newStateNodeSet) {
+		diff.Removed = append(diff.Removed, oldStateNodeMap[removedName])
 	}
-
-	// Find the added and changed StateNodesWithPods
-	for _, newStateNodeWithPods := range newStateNodesWithPods {
-		oldStateNodeWithPods, exists := oldStateNodeSet[newStateNodeWithPods.GetName()]
-
-		if !exists { // Same opportunity for optimization as in pods
-			diff.Added = append(diff.Added, newStateNodeWithPods)
-		} else if hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods) {
-			diff.Changed = append(diff.Changed, newStateNodeWithPods)
+	for commonName := range newStateNodeSet.Intersection(oldStateNodeSet) {
+		if hasStateNodeWithPodsChanged(oldStateNodeMap[commonName], newStateNodeMap[commonName]) {
+			diff.Changed = append(diff.Changed, newStateNodeMap[commonName])
 		}
 	}
-
-	// Find the removed StateNodesWithPods
-	for _, oldStateNodeWithPods := range oldStateNodesWithPods {
-		if _, exists := newStateNodeSet[oldStateNodeWithPods.GetName()]; !exists {
-			diff.Removed = append(diff.Removed, oldStateNodeWithPods)
-		}
-	}
-
 	return diff
 }
 
@@ -319,15 +498,22 @@ func diffBindings(old, new map[types.NamespacedName]string) BindingDifferences {
 			diff.Removed[k] = v
 		}
 	}
-
 	// Find the added bindings
 	for k, v := range new {
 		if _, ok := old[k]; !ok {
 			diff.Added[k] = v
 		}
 	}
-
 	return diff
+}
+
+// Take differenceTypes to map like above, by name
+func mapInstanceTypesByName(instanceTypes []*cloudprovider.InstanceType) map[string]*cloudprovider.InstanceType {
+	itMap := map[string]*cloudprovider.InstanceType{}
+	for _, it := range instanceTypes {
+		itMap[it.Name] = it
+	}
+	return itMap
 }
 
 // This is the diffInstanceTypes function which gets the differences between instance types
@@ -338,35 +524,23 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 		Changed: []*cloudprovider.InstanceType{},
 	}
 
-	// Cast InstanceTypes slices to sets for unordered reference by their Name
-	oldTypeSet := map[string]*cloudprovider.InstanceType{}
-	for _, instanceType := range oldTypes {
-		oldTypeSet[instanceType.Name] = instanceType
+	oldTypeMap := mapInstanceTypesByName(oldTypes)
+	oldTypeSet := sets.KeySet(oldTypeMap)
+	newTypeMap := mapInstanceTypesByName(newTypes)
+	newTypeSet := sets.KeySet(newTypeMap)
+
+	// Find the added, removed and changed instanceTypes
+	for addedName := range newTypeSet.Difference(oldTypeSet) {
+		diff.Added = append(diff.Added, newTypeMap[addedName])
 	}
-
-	newTypeSet := map[string]*cloudprovider.InstanceType{}
-	for _, instanceType := range newTypes {
-		newTypeSet[instanceType.Name] = instanceType
+	for removedName := range oldTypeSet.Difference(newTypeSet) {
+		diff.Removed = append(diff.Removed, oldTypeMap[removedName])
 	}
-
-	// Find the added and changed instance types
-	for _, newType := range newTypes {
-		oldType, exists := oldTypeSet[newType.Name]
-
-		if !exists {
-			diff.Added = append(diff.Added, newType)
-		} else if hasReducedInstanceTypeChanged(oldType, newType) {
-			diff.Changed = append(diff.Changed, newType)
+	for commonName := range newTypeSet.Intersection(oldTypeSet) {
+		if hasReducedInstanceTypeChanged(oldTypeMap[commonName], newTypeMap[commonName]) {
+			diff.Changed = append(diff.Changed, newTypeMap[commonName])
 		}
 	}
-
-	// Find the removed instance types
-	for _, oldType := range oldTypes {
-		if _, exists := newTypeSet[oldType.Name]; !exists {
-			diff.Removed = append(diff.Removed, oldType)
-		}
-	}
-
 	return diff
 }
 

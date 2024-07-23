@@ -79,6 +79,9 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		return reconcile.Result{}, err
 	}
 
+	// TESTING ONLY, delete later when it's a separate tool
+	// Pull
+
 	// Markers for testing, delete later
 	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
 	fmt.Println()
@@ -95,7 +98,7 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 
 // Logs the scheduling inputs from the heap as either a baseline or differences
 func (c *Controller) logSchedulingInputsToPV() error {
-	inputDifferences := []*SchedulingInputDifferences{}
+	batchedDifferences := []*SchedulingInputDifferences{}
 	for c.schedulingInputHeap.Len() > 0 {
 		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput)
 
@@ -110,12 +113,12 @@ func (c *Controller) logSchedulingInputsToPV() error {
 			c.mostRecentBaseline = &currentInput
 		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
 			currentDifferences := currentInput.Diff(c.mostRecentBaseline)
-			inputDifferences = append(inputDifferences, currentDifferences)
+			batchedDifferences = append(batchedDifferences, currentDifferences)
 			c.shouldRebaseline = c.determineRebaseline(currentDifferences.getByteSize())
 		}
 	}
 
-	err := c.logSchedulingDifferencesToPV(inputDifferences)
+	err := c.logBatchedSchedulingDifferencesToPV(batchedDifferences)
 	if err != nil {
 		fmt.Println("Error saving differences to PV:", err)
 		return err
@@ -140,19 +143,18 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 }
 
 // TODO: Eventually merge these individual difference prints to all the differences within a batch (similar to metadata)
-func (c *Controller) logSchedulingDifferencesToPV(differences []*SchedulingInputDifferences) error {
-	if len(differences) == 0 {
+func (c *Controller) logBatchedSchedulingDifferencesToPV(batchedDifferences []*SchedulingInputDifferences) error {
+	if len(batchedDifferences) == 0 {
 		return nil // Nothing to log.
 	}
 
-	logdata, err := MarshalBatchedDifferences(differences)
+	logdata, err := MarshalBatchedDifferences(batchedDifferences)
 	if err != nil {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
 	}
 
-	start, end := GetTimeWindow(differences)
-
+	start, end := GetTimeWindow(batchedDifferences)
 	startTimestampStr := start.Format("2006-01-02_15-04-05")
 	endTimestampStr := end.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", startTimestampStr, endTimestampStr)

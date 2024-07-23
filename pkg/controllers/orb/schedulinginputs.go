@@ -89,6 +89,13 @@ func (si SchedulingInput) String() string {
 	return protoSchedulingInput(&si).String()
 }
 
+func (si *SchedulingInput) isEmpty() bool {
+	return len(si.PendingPods) == 0 &&
+		len(si.StateNodesWithPods) == 0 &&
+		len(si.Bindings) == 0 &&
+		len(si.InstanceTypes) == 0
+}
+
 func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
 	stateNodesWithPods := []*StateNodeWithPods{}
 	for _, stateNode := range reduceStateNodes(stateNodes) {
