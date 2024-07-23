@@ -215,7 +215,7 @@ func (c *Controller) determineRebaseline(diffSize uintptr) bool {
 
 	// If differences' size exceeds threshold percentage, rebaseline and update moving average
 	if diffSizeFloat > c.rebaselineThreshold*baselineSizeFloat {
-		c.baselineSize = diffSize
+		c.baselineSize = reflect.TypeOf(diffSize).Size()
 		c.deltaToBaselineAvg = float32(diffSize) / baselineSizeFloat
 		return true
 	}
