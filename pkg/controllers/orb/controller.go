@@ -98,17 +98,19 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 func (c *Controller) logSchedulingInputsToPV() error {
 	batchedDifferences := []*SchedulingInputDifferences{}
 	for c.schedulingInputHeap.Len() > 0 {
+		fmt.Println("This many elements left on the heap: ", c.schedulingInputHeap.Len())
 		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput)
 
 		// Set the baseline on initial input or upon rebaselining
 		if c.mostRecentBaseline == nil || c.shouldRebaseline {
+			c.mostRecentBaseline = &currentInput
+			c.shouldRebaseline = false
+
 			err := c.logSchedulingBaselineToPV(&currentInput)
 			if err != nil {
 				fmt.Println("Error saving baseline to PV:", err)
 				return err
 			}
-			c.shouldRebaseline = false
-			c.mostRecentBaseline = &currentInput
 		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
 			currentDifferences := currentInput.Diff(c.mostRecentBaseline)
 			batchedDifferences = append(batchedDifferences, currentDifferences)
@@ -140,7 +142,6 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	return c.writeToPV(logdata, path)
 }
 
-// TODO: Eventually merge these individual difference prints to all the differences within a batch (similar to metadata)
 func (c *Controller) logBatchedSchedulingDifferencesToPV(batchedDifferences []*SchedulingInputDifferences) error {
 	if len(batchedDifferences) == 0 {
 		return nil // Nothing to log.
