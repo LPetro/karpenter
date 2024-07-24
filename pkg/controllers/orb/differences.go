@@ -137,8 +137,8 @@ func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
 
 // Gets the time window (i.e. from start to end timestamp) from a slice of differences. It returns (start, end)
 func GetTimeWindow(differences []*SchedulingInputDifferences) (time.Time, time.Time) {
-	start := time.Now().UTC()
-	end := time.Time{}.UTC()
+	start := time.Time{}.AddDate(10000, 0, 0) // Arbitrary future data to represent "infinity"
+	end := time.Time{}
 	for _, diff := range differences {
 		timestamp := diff.GetTimestamp()
 		if timestamp.Before(start) {

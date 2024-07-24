@@ -146,17 +146,17 @@ func (c *Controller) logBatchedSchedulingDifferencesToPV(batchedDifferences []*S
 		return nil // Nothing to log.
 	}
 
-	logdata, err := MarshalBatchedDifferences(batchedDifferences)
-	if err != nil {
-		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
-		return err
-	}
-
 	start, end := GetTimeWindow(batchedDifferences)
 	startTimestampStr := start.Format("2006-01-02_15-04-05")
 	endTimestampStr := end.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", startTimestampStr, endTimestampStr)
 	path := filepath.Join("/data", fileName)
+
+	logdata, err := MarshalBatchedDifferences(batchedDifferences)
+	if err != nil {
+		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
+		return err
+	}
 
 	fmt.Println("Writing differences data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
