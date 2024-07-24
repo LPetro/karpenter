@@ -139,10 +139,10 @@ func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
 func GetTimeWindow(differences []*SchedulingInputDifferences) (time.Time, time.Time) {
 	start := time.Time{}
 	end := time.Time{}
-	fmt.Printf("Getting time for %f Scheduling Input Differences\n", len(differences))
+	fmt.Printf("Getting time for %d Scheduling Input Differences\n", len(differences))
 	for i, diff := range differences {
 		timestamp := diff.GetTimestamp()
-		fmt.Printf("Difference #%s has time: %s\n", string(rune(i)), timestamp.Format("2006-01-02_15-04-05"))
+		fmt.Printf("Difference #%d has time: %s\n", i, timestamp.Format("2006-01-02_15-04-05"))
 		if start.IsZero() || timestamp.Before(start) {
 			start = timestamp
 		}
