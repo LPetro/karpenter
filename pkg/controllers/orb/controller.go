@@ -137,7 +137,7 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join("/data", fileName)
 
-	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
+	fmt.Printf("Writing baseline data to S3 bucket. time: %s\n", timestampStr) // test print / remove later
 	return c.writeToPV(logdata, path)
 }
 
