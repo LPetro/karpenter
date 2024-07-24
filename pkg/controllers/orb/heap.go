@@ -46,7 +46,7 @@ func (h SchedulingInputHeap) Swap(i, j int) {
 }
 
 func (h *SchedulingInputHeap) Push(x interface{}) {
-	heap.Push(h, x)
+	heap.Push(h, x.(SchedulingInput))
 	//*h = append(*h, x.(SchedulingInput))
 }
 
