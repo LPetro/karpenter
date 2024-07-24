@@ -99,9 +99,7 @@ func (c *Controller) Register(_ context.Context, m manager.Manager) error {
 func (c *Controller) logSchedulingInputsToPV() error {
 	batchedDifferences := []*SchedulingInputDifferences{}
 	for c.schedulingInputHeap.Len() > 0 {
-		fmt.Println("This many elements left on the heap: ", c.schedulingInputHeap.Len())
 		currentInput := heap.Pop(c.schedulingInputHeap).(SchedulingInput)
-		fmt.Println("Popped an element from the heap with time: ", currentInput.Timestamp.Format("2006-01-02_15-04-05"))
 
 		// Set the baseline on initial input or upon rebaselining
 		if c.mostRecentBaseline == nil || c.shouldRebaseline {
@@ -139,7 +137,7 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join("/data", fileName)
 
-	fmt.Printf("Writing baseline data to S3 bucket. time: %s\n", timestampStr) // test print / remove later
+	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
 }
 
@@ -182,7 +180,7 @@ func (c *Controller) logSchedulingMetadataToPV(heap *SchedulingMetadataHeap) err
 		return err
 	}
 
-	fmt.Println("Writing metadata to S3 bucket!")
+	fmt.Println("Writing metadata to S3 bucket.")
 	return c.writeToPV(mappingdata, path)
 }
 
