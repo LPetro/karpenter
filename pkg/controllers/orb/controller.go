@@ -103,14 +103,13 @@ func (c *Controller) logSchedulingInputsToPV() error {
 
 		// Set the baseline on initial input or upon rebaselining
 		if c.mostRecentBaseline == nil || c.shouldRebaseline {
-			c.mostRecentBaseline = &currentInput
-			c.shouldRebaseline = false
-
 			err := c.logSchedulingBaselineToPV(&currentInput)
 			if err != nil {
 				fmt.Println("Error saving baseline to PV:", err)
 				return err
 			}
+			c.mostRecentBaseline = &currentInput
+			c.shouldRebaseline = false
 		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
 			currentDifferences := currentInput.Diff(c.mostRecentBaseline)
 			batchedDifferences = append(batchedDifferences, currentDifferences)
