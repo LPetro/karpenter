@@ -122,20 +122,20 @@ func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 // by allowing us to save all of them by their unique name, and then associating the NodePool name with its corresponding instancetype names
 func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprovider.InstanceType) ([]*cloudprovider.InstanceType, map[string][]string) {
 	allInstanceTypesNameMap := map[string]*cloudprovider.InstanceType{}
-	nodePoolMapping := map[string][]string{}
-	for nodePoolName, instanceTypeSlice := range instanceTypes {
+	nodePoolToInstanceTypes := map[string][]string{}
+	for nodePool, instanceTypeSlice := range instanceTypes {
 		instanceTypeSliceNameMap := mapInstanceTypesByName(instanceTypeSlice)
 		for instanceTypeName, instanceType := range instanceTypeSliceNameMap {
 			allInstanceTypesNameMap[instanceTypeName] = instanceType
 		}
-		nodePoolMapping[nodePoolName] = sets.KeySet(instanceTypeSliceNameMap).UnsortedList()
+		nodePoolToInstanceTypes[nodePool] = sets.KeySet(instanceTypeSliceNameMap).UnsortedList()
 	}
-	uniqueInstanceTypeNames := sets.KeySet(allInstanceTypesNameMap)
+	uniqueInstanceTypeNames := sets.KeySet(allInstanceTypesNameMap).UnsortedList()
 	uniqueInstanceTypes := []*cloudprovider.InstanceType{}
-	for _, instanceTypeName := range uniqueInstanceTypeNames.UnsortedList() {
+	for _, instanceTypeName := range uniqueInstanceTypeNames {
 		uniqueInstanceTypes = append(uniqueInstanceTypes, allInstanceTypesNameMap[instanceTypeName])
 	}
-	return uniqueInstanceTypes, nodePoolMapping
+	return uniqueInstanceTypes, nodePoolToInstanceTypes
 }
 
 /* Functions to reduce resources in Scheduling Inputs to the constituent parts we care to log / introspect */
