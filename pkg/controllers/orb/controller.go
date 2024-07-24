@@ -17,6 +17,7 @@ limitations under the License.
 package orb
 
 import (
+	"container/heap"
 	"context"
 	"fmt"
 	"math"
@@ -99,7 +100,7 @@ func (c *Controller) logSchedulingInputsToPV() error {
 	batchedDifferences := []*SchedulingInputDifferences{}
 	for c.schedulingInputHeap.Len() > 0 {
 		fmt.Println("This many elements left on the heap: ", c.schedulingInputHeap.Len())
-		currentInput := c.schedulingInputHeap.Pop().(SchedulingInput)
+		currentInput := heap.Pop(c.schedulingInputHeap).(SchedulingInput)
 		fmt.Println("Popped an element from the heap with time: ", currentInput.Timestamp.Format("2006-01-02_15-04-05"))
 
 		// Set the baseline on initial input or upon rebaselining

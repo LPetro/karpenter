@@ -46,17 +46,15 @@ func (h SchedulingInputHeap) Swap(i, j int) {
 }
 
 func (h *SchedulingInputHeap) Push(x interface{}) {
-	heap.Push(h, x.(SchedulingInput))
-	//*h = append(*h, x.(SchedulingInput))
+	*h = append(*h, x.(SchedulingInput))
 }
 
 func (h *SchedulingInputHeap) Pop() interface{} {
-	// old := *h
-	// n := len(old)
-	// x := old[n-1]
-	// *h = old[:n-1]
-	// return x
-	return heap.Pop(h)
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
 }
 
 func NewSchedulingInputHeap() *SchedulingInputHeap {
@@ -70,7 +68,7 @@ func (h *SchedulingInputHeap) LogSchedulingInput(ctx context.Context, kubeClient
 	pods []*v1.Pod, stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType) {
 	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes)
 	si.Reduce()
-	h.Push(si)
+	heap.Push(h, si)
 }
 
 type SchedulingMetadataHeap []SchedulingMetadata
