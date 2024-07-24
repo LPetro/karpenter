@@ -79,9 +79,6 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		return reconcile.Result{}, err
 	}
 
-	// TESTING ONLY, delete later when it's a separate tool
-	// Pull
-
 	// Markers for testing, delete later
 	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
 	fmt.Println()

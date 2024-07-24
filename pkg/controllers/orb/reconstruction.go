@@ -31,55 +31,6 @@ import (
 
 /* These will be part of the command-line printing representation... */
 
-// Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
-// They highly recommend sanitizing inputs before accessing that path.
-func sanitizePath(path string) string {
-	// Remove any leading or trailing slashes, "../" or "./"...
-	path = strings.TrimPrefix(path, "/")
-	path = strings.TrimSuffix(path, "/")
-	path = regexp.MustCompile(`\.\.\/`).ReplaceAllString(path, "")
-	path = regexp.MustCompile(`\.\/`).ReplaceAllString(path, "")
-	path = strings.ReplaceAll(path, "../", "")
-
-	return path
-}
-
-// Function to pull from an S3 bucket
-func ReadFromPV(logname string) ([]byte, error) {
-	path := filepath.Join("/data", sanitizePath(logname))
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil, err
-	}
-	defer file.Close()
-
-	contents, err := io.ReadAll(file)
-	if err != nil {
-		fmt.Println("Error reading file bytes:", err)
-		return nil, err
-	}
-	return contents, nil
-}
-
-// Function for reconstructing inputs
-// Read from the PV to check (will be what the ORB tool does from the Command Line)
-func ReconstructSchedulingInput(fileName string) (*SchedulingInput, error) {
-	readdata, err := ReadFromPV(fileName)
-	if err != nil {
-		fmt.Println("Error reading from PV:", err)
-		return nil, err
-	}
-
-	si, err := UnmarshalSchedulingInput(readdata)
-	if err != nil {
-		fmt.Println("Error converting PB to SI:", err)
-		return nil, err
-	}
-
-	return si, nil
-}
-
 // We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
 // In reality, we could just pull a file from a known directory, for known filename schemas in certain time ranges
 func ReadPVandReconstruct(timestamp time.Time) error {
@@ -110,6 +61,55 @@ func ReadPVandReconstruct(timestamp time.Time) error {
 
 	fmt.Println("Reconstruction written to file successfully!")
 	return nil
+}
+
+// Function for reconstructing inputs
+// Read from the PV to check (will be what the ORB tool does from the Command Line)
+func ReconstructSchedulingInput(fileName string) (*SchedulingInput, error) {
+	readdata, err := ReadFromPV(fileName)
+	if err != nil {
+		fmt.Println("Error reading from PV:", err)
+		return nil, err
+	}
+
+	si, err := UnmarshalSchedulingInput(readdata)
+	if err != nil {
+		fmt.Println("Error converting PB to SI:", err)
+		return nil, err
+	}
+
+	return si, nil
+}
+
+// Function to pull from an S3 bucket
+func ReadFromPV(logname string) ([]byte, error) {
+	path := filepath.Join("/data", sanitizePath(logname))
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+	defer file.Close()
+
+	contents, err := io.ReadAll(file)
+	if err != nil {
+		fmt.Println("Error reading file bytes:", err)
+		return nil, err
+	}
+	return contents, nil
+}
+
+// Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
+// They highly recommend sanitizing inputs before accessing that path.
+func sanitizePath(path string) string {
+	// Remove any leading or trailing slashes, "../" or "./"...
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimSuffix(path, "/")
+	path = regexp.MustCompile(`\.\.\/`).ReplaceAllString(path, "")
+	path = regexp.MustCompile(`\.\/`).ReplaceAllString(path, "")
+	path = strings.ReplaceAll(path, "../", "")
+
+	return path
 }
 
 func DebugWriteSchedulingInputStringToLogFile(item *SchedulingInput, timestampStr string) error {

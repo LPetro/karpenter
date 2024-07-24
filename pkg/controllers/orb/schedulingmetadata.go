@@ -20,8 +20,8 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
-	//"google.golang.org/protobuf/proto"
 )
 
 type SchedulingMetadata struct {
@@ -68,6 +68,15 @@ func reconstructSchedulingMetadata(mappingEntry *pb.SchedulingMetadataMap_Mappin
 		Action:    mappingEntry.Action,
 		Timestamp: timestamp,
 	}
+}
+
+func UnmarshalSchedulingMetadataMap(data []byte) (*pb.SchedulingMetadataMap, error) {
+	var schedulingMetadataMap pb.SchedulingMetadataMap
+	err := proto.Unmarshal(data, &schedulingMetadataMap)
+	if err != nil {
+		return nil, err
+	}
+	return &schedulingMetadataMap, nil
 }
 
 // Function to unmarshal the metadata

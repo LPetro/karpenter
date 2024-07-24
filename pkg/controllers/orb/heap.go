@@ -126,3 +126,12 @@ func protoSchedulingMetadataMap(heap *SchedulingMetadataHeap) *pb.SchedulingMeta
 	}
 	return mapping
 }
+
+func ReconstructSchedulingMetadataHeap(mapping *pb.SchedulingMetadataMap) *SchedulingMetadataHeap {
+	heap := NewSchedulingMetadataHeap()
+	for _, entry := range mapping.Entries {
+		metadata := reconstructSchedulingMetadata(entry)
+		heap.Push(metadata)
+	}
+	return heap
+}
