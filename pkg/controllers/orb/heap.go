@@ -38,7 +38,7 @@ func (h SchedulingInputHeap) Len() int {
 
 // This compares timestamps for a min heap, so that oldest inputs pop first.
 func (h SchedulingInputHeap) Less(i, j int) bool {
-	return h[i].Timestamp.Before(h[j].Timestamp)
+	return h[i].Timestamp.After(h[j].Timestamp)
 }
 
 func (h SchedulingInputHeap) Swap(i, j int) {
@@ -78,7 +78,7 @@ func (h SchedulingMetadataHeap) Len() int {
 }
 
 func (h SchedulingMetadataHeap) Less(i, j int) bool {
-	return h[i].Timestamp.Before(h[j].Timestamp)
+	return h[i].Timestamp.After(h[j].Timestamp)
 }
 
 func (h SchedulingMetadataHeap) Swap(i, j int) {
