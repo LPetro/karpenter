@@ -54,6 +54,10 @@ type InstanceTypeDifferences struct {
 	Added, Removed, Changed []*cloudprovider.InstanceType
 }
 
+type NodePoolsToInstanceTypesDifferences struct {
+	Added, Removed, Changed map[string][]string
+}
+
 func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
 	protoAdded, protoRemoved, protoChanged := crossSection(batchedDifferences)
 	protoDifferences := &pb.BatchedDifferences{
@@ -223,11 +227,12 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 	batchedAdded, batchedRemoved, batchedChanged, sortedBatchedTimes := crossSectionByTimestamp(batchedDifferences)
 
 	mergedInputs := &SchedulingInput{
-		Timestamp:          reconstructTime,
-		PendingPods:        baseline.PendingPods,
-		StateNodesWithPods: baseline.StateNodesWithPods,
-		Bindings:           baseline.Bindings,
-		InstanceTypes:      baseline.InstanceTypes,
+		Timestamp:             reconstructTime,
+		PendingPods:           baseline.PendingPods,
+		StateNodesWithPods:    baseline.StateNodesWithPods,
+		Bindings:              baseline.Bindings,
+		AllInstanceTypes:      baseline.AllInstanceTypes,
+		NodePoolInstanceTypes: baseline.NodePoolInstanceTypes,
 	}
 
 	// Iterate over the baseline, making each time's set of changes
@@ -254,7 +259,8 @@ func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *Schedul
 	iteratingInput.PendingPods = mergePods(iteratingInput.PendingPods, differences)
 	iteratingInput.StateNodesWithPods = mergeStateNodesWithPods(iteratingInput.StateNodesWithPods, differences)
 	mergeBindings(iteratingInput.Bindings, differences) // Already a map, so can merge in place
-	iteratingInput.InstanceTypes = mergeInstanceTypes(iteratingInput.InstanceTypes, differences)
+	iteratingInput.AllInstanceTypes = mergeInstanceTypes(iteratingInput.AllInstanceTypes, differences)
+	mergeNodePoolInstanceTypes(iteratingInput.NodePoolInstanceTypes, differences) // Already a map, so can merge in place
 }
 
 // TODO: Generalize the functions below to some interface mapping or "lo"-based helper.
@@ -343,17 +349,17 @@ func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, di
 
 	// Add, remove and change instanceTypes from the iterating instanceTypes
 	if differences.Added != nil && !differences.Added.isEmpty() {
-		for _, addingInstanceType := range differences.Added.InstanceTypes {
+		for _, addingInstanceType := range differences.Added.AllInstanceTypes {
 			iteratingInstanceTypesMap[addingInstanceType.Name] = addingInstanceType
 		}
 	}
 	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for _, removingInstanceType := range differences.Removed.InstanceTypes {
+		for _, removingInstanceType := range differences.Removed.AllInstanceTypes {
 			delete(iteratingInstanceTypesMap, removingInstanceType.Name)
 		}
 	}
 	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for _, changingInstanceType := range differences.Changed.InstanceTypes {
+		for _, changingInstanceType := range differences.Changed.AllInstanceTypes {
 			iteratingInstanceTypesMap[changingInstanceType.Name] = changingInstanceType
 		}
 	}
@@ -366,29 +372,49 @@ func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, di
 	return mergedInstanceTypes
 }
 
+func mergeNodePoolInstanceTypes(iteratingNodePoolInstanceTypes map[string][]string, differences *SchedulingInputDifferences) {
+	// Add, remove and change nodePoolInstanceTypes from the iterating nodePoolInstanceTypes
+	if differences.Added != nil && !differences.Added.isEmpty() {
+		for nodePoolName, addingInstanceTypes := range differences.Added.NodePoolInstanceTypes {
+			iteratingNodePoolInstanceTypes[nodePoolName] = addingInstanceTypes
+		}
+	}
+	if differences.Removed != nil && !differences.Removed.isEmpty() {
+		for nodePoolName := range differences.Removed.NodePoolInstanceTypes {
+			delete(iteratingNodePoolInstanceTypes, nodePoolName)
+		}
+	}
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		for nodePoolName, changingInstanceTypes := range differences.Changed.NodePoolInstanceTypes {
+			iteratingNodePoolInstanceTypes[nodePoolName] = changingInstanceTypes
+		}
+	}
+}
+
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
 func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferences {
 	// Determine the differences in each of the fields of ScheduleInput
 	podDiff := diffPods(oldSi.PendingPods, si.PendingPods)
 	snpDiff := diffStateNodes(oldSi.StateNodesWithPods, si.StateNodesWithPods)
 	bindingsDiff := diffBindings(oldSi.Bindings, si.Bindings)
-	itDiff := diffInstanceTypes(oldSi.InstanceTypes, si.InstanceTypes)
+	itDiff := diffInstanceTypes(oldSi.AllInstanceTypes, si.AllInstanceTypes)
+	npitDiff := diffNodePoolsToInstanceTypes(oldSi.NodePoolInstanceTypes, si.NodePoolInstanceTypes)
 
 	diffAdded := &SchedulingInput{}
 	diffRemoved := &SchedulingInput{}
 	diffChanged := &SchedulingInput{}
 
 	// If there are added differences, include them
-	if len(podDiff.Added) > 0 || len(snpDiff.Added) > 0 || len(bindingsDiff.Added) > 0 || len(itDiff.Added) > 0 {
-		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added)
+	if len(podDiff.Added) > 0 || len(snpDiff.Added) > 0 || len(bindingsDiff.Added) > 0 || len(itDiff.Added) > 0 || len(npitDiff.Added) > 0 {
+		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added)
 		fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
 	}
-	if len(podDiff.Removed) > 0 || len(snpDiff.Removed) > 0 || len(bindingsDiff.Removed) > 0 || len(itDiff.Removed) > 0 {
-		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed)
+	if len(podDiff.Removed) > 0 || len(snpDiff.Removed) > 0 || len(bindingsDiff.Removed) > 0 || len(itDiff.Removed) > 0 || len(npitDiff.Removed) > 0 {
+		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed)
 		fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
 	}
-	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 {
-		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed)
+	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 || len(npitDiff.Changed) > 0 {
+		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed)
 		fmt.Println("Diff Scheduling Input changed is... ", diffChanged.String()) // Test print, delete later
 	}
 
@@ -539,6 +565,33 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 	for commonName := range newTypeSet.Intersection(oldTypeSet) {
 		if hasReducedInstanceTypeChanged(oldTypeMap[commonName], newTypeMap[commonName]) {
 			diff.Changed = append(diff.Changed, newTypeMap[commonName])
+		}
+	}
+	return diff
+}
+
+// This function is already a mapping, so it will mirror the diff for Bindings in the map checking
+func diffNodePoolsToInstanceTypes(old, new map[string][]string) NodePoolsToInstanceTypesDifferences {
+	diff := NodePoolsToInstanceTypesDifferences{
+		Added:   map[string][]string{},
+		Removed: map[string][]string{},
+		Changed: map[string][]string{},
+	}
+
+	// Find the changed or removed node pools
+	for k, v := range old {
+		if newVal, ok := new[k]; ok {
+			if !equality.Semantic.DeepEqual(v, newVal) {
+				diff.Changed[k] = newVal
+			}
+		} else {
+			diff.Removed[k] = v
+		}
+	}
+	// Find the added node pools
+	for k, v := range new {
+		if _, ok := old[k]; !ok {
+			diff.Added[k] = v
 		}
 	}
 	return diff

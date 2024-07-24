@@ -20,6 +20,7 @@ message SchedulingInput {
   repeated StateNodeWithPods statenodes_data = 3;
   Bindings bindings_data = 4;
   repeated ReducedInstanceType instancetypes_data = 5;
+  NodePoolsToInstanceTypes nodepoolstoinstancetypes_data = 6;
 }
 
 message ReducedPod {
@@ -94,4 +95,14 @@ message Bindings {
       string name = 2;
     }
   }  
+}
+
+// NodepoolsToInstanceTypes represents the mapping from each Nodepool to its set of InstanceTypes by name
+message NodePoolsToInstanceTypes {
+  repeated NodePoolToInstanceTypes nodepoolstoinstancetypes = 1;
+
+  message NodePoolToInstanceTypes {
+    string nodepool = 1;
+    repeated string instancetype_names = 2;
+  }
 }

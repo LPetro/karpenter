@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/karpenter/pkg/apis/v1beta1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
@@ -36,11 +37,12 @@ import (
 
 // These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
 type SchedulingInput struct {
-	Timestamp          time.Time
-	PendingPods        []*v1.Pod
-	StateNodesWithPods []*StateNodeWithPods
-	Bindings           map[types.NamespacedName]string
-	InstanceTypes      []*cloudprovider.InstanceType
+	Timestamp             time.Time
+	PendingPods           []*v1.Pod
+	StateNodesWithPods    []*StateNodeWithPods
+	Bindings              map[types.NamespacedName]string
+	AllInstanceTypes      []*cloudprovider.InstanceType
+	NodePoolInstanceTypes map[string][]string
 }
 
 // A stateNode with the Pods it has on it.
@@ -52,24 +54,27 @@ type StateNodeWithPods struct {
 
 // Construct and reduce the Scheduling Input down to what's minimally required for re-simulation
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod,
-	stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes []*cloudprovider.InstanceType) SchedulingInput {
+	stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType) SchedulingInput {
+	allInstanceTypes, nodePoolInstanceTypes := getAllInstanceTypesAndNodePoolMapping(instanceTypes)
 	return SchedulingInput{
-		Timestamp:          scheduledTime,
-		PendingPods:        pendingPods,
-		StateNodesWithPods: newStateNodesWithPods(ctx, kubeClient, stateNodes),
-		Bindings:           bindings,
-		InstanceTypes:      instanceTypes,
+		Timestamp:             scheduledTime,
+		PendingPods:           pendingPods,
+		StateNodesWithPods:    newStateNodesWithPods(ctx, kubeClient, stateNodes),
+		Bindings:              bindings,
+		AllInstanceTypes:      allInstanceTypes,
+		NodePoolInstanceTypes: nodePoolInstanceTypes,
 	}
 }
 
 func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods,
-	bindings map[types.NamespacedName]string, instanceTypes []*cloudprovider.InstanceType) *SchedulingInput {
+	bindings map[types.NamespacedName]string, instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string) *SchedulingInput {
 	return &SchedulingInput{
-		Timestamp:          timestamp,
-		PendingPods:        pendingPods,
-		StateNodesWithPods: stateNodesWithPods,
-		Bindings:           bindings,
-		InstanceTypes:      instanceTypes,
+		Timestamp:             timestamp,
+		PendingPods:           pendingPods,
+		StateNodesWithPods:    stateNodesWithPods,
+		Bindings:              bindings,
+		AllInstanceTypes:      instanceTypes,
+		NodePoolInstanceTypes: nodePoolInstanceTypes,
 	}
 }
 
@@ -82,7 +87,7 @@ func (snp StateNodeWithPods) GetName() string {
 
 func (si *SchedulingInput) Reduce() {
 	si.PendingPods = ReducePods(si.PendingPods)
-	si.InstanceTypes = ReduceInstanceTypes(si.InstanceTypes)
+	si.AllInstanceTypes = ReduceInstanceTypes(si.AllInstanceTypes)
 }
 
 func (si SchedulingInput) String() string {
@@ -93,7 +98,7 @@ func (si *SchedulingInput) isEmpty() bool {
 	return len(si.PendingPods) == 0 &&
 		len(si.StateNodesWithPods) == 0 &&
 		len(si.Bindings) == 0 &&
-		len(si.InstanceTypes) == 0
+		len(si.AllInstanceTypes) == 0
 }
 
 func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
@@ -111,6 +116,26 @@ func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 		})
 	}
 	return stateNodesWithPods
+}
+
+// Gets the superset of all InstanceTypes from the mapping. This is to simplify saving the NodePool -> InstanceType map
+// by allowing us to save all of them by their unique name, and then associating the NodePool name with its corresponding instancetype names
+func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprovider.InstanceType) ([]*cloudprovider.InstanceType, map[string][]string) {
+	allInstanceTypesNameMap := map[string]*cloudprovider.InstanceType{}
+	nodePoolMapping := map[string][]string{}
+	for nodePoolName, instanceTypeSlice := range instanceTypes {
+		instanceTypeSliceNameMap := mapInstanceTypesByName(instanceTypeSlice)
+		for instanceTypeName, instanceType := range instanceTypeSliceNameMap {
+			allInstanceTypesNameMap[instanceTypeName] = instanceType
+		}
+		nodePoolMapping[nodePoolName] = sets.KeySet(instanceTypeSliceNameMap).UnsortedList()
+	}
+	uniqueInstanceTypeNames := sets.KeySet(allInstanceTypesNameMap)
+	uniqueInstanceTypes := []*cloudprovider.InstanceType{}
+	for _, instanceTypeName := range uniqueInstanceTypeNames.UnsortedList() {
+		uniqueInstanceTypes = append(uniqueInstanceTypes, allInstanceTypesNameMap[instanceTypeName])
+	}
+	return uniqueInstanceTypes, nodePoolMapping
 }
 
 /* Functions to reduce resources in Scheduling Inputs to the constituent parts we care to log / introspect */
@@ -238,11 +263,12 @@ func UnmarshalSchedulingInput(schedulingInputData []byte) (*SchedulingInput, err
 
 func protoSchedulingInput(si *SchedulingInput) *pb.SchedulingInput {
 	return &pb.SchedulingInput{
-		Timestamp:         si.Timestamp.Format("2006-01-02_15-04-05"),
-		PendingpodData:    protoPods(si.PendingPods),
-		BindingsData:      protoBindings(si.Bindings),
-		StatenodesData:    protoStateNodesWithPods(si.StateNodesWithPods),
-		InstancetypesData: protoInstanceTypes(si.InstanceTypes),
+		Timestamp:                    si.Timestamp.Format("2006-01-02_15-04-05"),
+		PendingpodData:               protoPods(si.PendingPods),
+		BindingsData:                 protoBindings(si.Bindings),
+		StatenodesData:               protoStateNodesWithPods(si.StateNodesWithPods),
+		InstancetypesData:            protoInstanceTypes(si.AllInstanceTypes),
+		NodepoolstoinstancetypesData: protoNodePoolInstanceTypes(si.NodePoolInstanceTypes),
 	}
 }
 
@@ -258,6 +284,7 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		reconstructStateNodesWithPods(pbsi.GetStatenodesData()),
 		reconstructBindings(pbsi.GetBindingsData()),
 		reconstructInstanceTypes(pbsi.GetInstancetypesData()),
+		reconstructNodePoolInstanceTypes(pbsi.GetNodepoolstoinstancetypesData()),
 	), nil
 }
 
@@ -486,4 +513,23 @@ func reconstructBindings(bindingsProto *pb.Bindings) map[types.NamespacedName]st
 		bindings[podNamespacedName] = binding.NodeName
 	}
 	return bindings
+}
+
+func protoNodePoolInstanceTypes(nodePoolInstanceTypes map[string][]string) *pb.NodePoolsToInstanceTypes {
+	npitProto := &pb.NodePoolsToInstanceTypes{}
+	for nodePool, instanceTypeNames := range nodePoolInstanceTypes {
+		npitProto.Nodepoolstoinstancetypes = append(npitProto.Nodepoolstoinstancetypes, &pb.NodePoolsToInstanceTypes_NodePoolToInstanceTypes{
+			Nodepool:          nodePool,
+			InstancetypeNames: instanceTypeNames,
+		})
+	}
+	return npitProto
+}
+
+func reconstructNodePoolInstanceTypes(npitProto *pb.NodePoolsToInstanceTypes) map[string][]string {
+	nodePoolInstanceTypes := map[string][]string{}
+	for _, npit := range npitProto.Nodepoolstoinstancetypes {
+		nodePoolInstanceTypes[npit.Nodepool] = npit.InstancetypeNames
+	}
+	return nodePoolInstanceTypes
 }
