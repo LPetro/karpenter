@@ -35,8 +35,9 @@ func main() {
 	options := readMetadataLogs(dirPath)
 	selectedOption := promptUserForOption(options)
 
-	fmt.Printf("Pulling this option: %s from this directory: %s\n", selectedOption, dirPath)
-	resimulateFromOption(selectedOption.Timestamp, dirPath)
+	fmt.Printf("Pulling option: %s from this directory: %s\n", selectedOption, dirPath)
+
+	resimulateFromOption(dirPath, selectedOption.Timestamp)
 }
 
 func parseCommandLineArgs() string {
@@ -110,19 +111,28 @@ func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadat
 		// fmt.Printf("You selected %s, but for testing I'm running just the first one\n", input)
 		return promptUserForOption(options)
 	}
-	fmt.Printf("You selected %s\n", options[choice].String())
 	return options[choice]
 }
 
-func resimulateFromOption(timestamp time.Time, dirPath string) {
-	fileName := GetMostRecentBaseline(timestamp, dirPath)
-	fmt.Println("Finding this file: ", fileName)
-	_, err := ReadSampleandReconstruct(dirPath, fileName, timestamp)
+func resimulateFromOption(dirPath string, reconstructTime time.Time) {
+	baselineFilename, differencesFilenames := GetReconstructionFiles(dirPath, reconstructTime)
+	fmt.Println("Finding baseline file: ", baselineFilename)
+	reconstructedBaseline, err := ReconstructSampleSchedulingInput(dirPath, baselineFilename)
 	if err != nil {
 		fmt.Println("Error executing option:", err)
+		return
 	}
 
-	// reconstructedDifferences := []*orb.SchedulingInputDifferences{}
+	reconstructedDifferences, err := ReconstructSampleSchedulingInputDifferences(dirPath, differencesFilenames)
+	if err != nil {
+		fmt.Println("Error reconstructing scheduling input differences", err)
+		return
+	}
+
+	reconstructedSchedulingInput := orb.MergeDifferences(reconstructedBaseline, reconstructedDifferences, reconstructTime)
+
+	// Debug print reconstruction to file as string
+	printReconstructionToFile(dirPath, reconstructedSchedulingInput)
 
 	// // Resimulate from this scheduling input
 	// ctx := signals.NewContext()
@@ -156,13 +166,23 @@ func ReadFromSampleFolder(dirPath string, logname string) ([]byte, error) {
 
 /* These will be part of the command-line printing representation... */
 
+// Function to get the files which will reconstruct a scheduling input based on a target "reconstructTime"
+// This includes getting the the most recent baseline and the list of differences. It will return that as a tuple (string, []string)
+func GetReconstructionFiles(dirPath string, reconstructTime time.Time) (string, []string) {
+	baselineName, baselineTime := GetMostRecentBaseline(dirPath, reconstructTime)
+	differences := GetDifferencesFromBaseline(dirPath, reconstructTime, baselineTime)
+	return baselineName, differences
+}
+
+// Function to get the differences between the scheduling input and the baseline
+
 // Based on a passed in time (time.Time), get the most recent Baseline filename from a list of filenames
-func GetMostRecentBaseline(reconstructTime time.Time, dirPath string) string {
+func GetMostRecentBaseline(dirPath string, reconstructTime time.Time) (string, time.Time) {
 	// Get all files in the directory
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
-		return ""
+		return "", time.Time{}
 	}
 
 	// Filter out files that don't start with "SchedulingInputBaseline"
@@ -175,10 +195,8 @@ func GetMostRecentBaseline(reconstructTime time.Time, dirPath string) string {
 	}
 	// If no baseline files found, return an empty string
 	if len(baselineFiles) == 0 {
-		return ""
+		return "", time.Time{}
 	}
-
-	fmt.Println("Looking for this timestamp: ", reconstructTime.Format("2006-01-02_15-04-05"))
 
 	// For baseline files that do start with that, after Baseline there should be _ then a timestamp formated as "2006-01-02 15-04-05"
 	// Parse each of those timestamps from all these files and make a slice of timestamps
@@ -211,65 +229,64 @@ func GetMostRecentBaseline(reconstructTime time.Time, dirPath string) string {
 	mostRecentBaselineFilename := fmt.Sprintf("SchedulingInputBaseline_%s.log", mostRecentTimestamp.Format("2006-01-02_15-04-05"))
 
 	// Return the most recent baseline filename
-	return mostRecentBaselineFilename
+	return mostRecentBaselineFilename, mostRecentTimestamp
 }
 
-// // Similar to the above get most recent baseline, this function will get the most recent scheduling input differences.
-// // The differences here those is that this is a slice of differences up to and including the SchedulingInputDifference_... file that contains the
-// // reconstructTime timestamp within it's changes (it could be the first, the last or somewhere in the middle); and that it returns the slice of strings
-// // of all those filenames.
-// func GetDifferencesHistoryUpTilTime(reconstructTime time.Time, dirPath string) []string {
-// 	// Get all files in the directory
-// 	files, err := os.ReadDir(dirPath)
-// 	if err != nil {
-// 		fmt.Println("Error reading directory:", err)
-// 		return nil
-// 	}
-
-// 	// Filter out files that don't start with "SchedulingInputDifference"
-// 	var differenceFiles []string
-// 	regex := regexp.MustCompile(`^SchedulingInputDifference.*\.log$`)
-// 	for _, file := range files {
-// 		if regex.MatchString(file.Name()) {
-// 			differenceFiles = append(differenceFiles, file.Name())
-// 		}
-// 	}
-// 	// If no difference files found, return an empty string
-// 	if len(differenceFiles) == 0 {
-// 		return nil
-// 	}
-
-// 	// For difference files that do start with that, after SchedulingInputDifference there should be _ then a timestamp formated as "2006-01-02 15-04-05"
-// 	// Parse each of those timestamps from all these files and make a slice of timestamps
-// 	timestamps := []time.Time{}
-// 	regex = regexp.MustCompile(`_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})\.log$`)
-// 	// Iterate through the differenceFiles and extract the timestamp from each filename
-// 	// This is the same as the above, but we're just getting the timestamps from the difference files
-// 	for _, differenceFile := range differenceFiles {
-// 		match := regex.FindStringSubmatch(differenceFile)
-// 		if len(match) > 1 {
-// 			timestamp, err := time.Parse("2006-01-02_15-04-05", match[1])
-// 			if err == nil {
-// 				timestamps = append(timestamps, timestamp)
-// 			}
-// 		}
-// 	}
-
-// 	// sort those timestamps to be oldest to newest
-
-func ReadSampleandReconstruct(dirPath string, mostRecentBaselineFilename string, timestamp time.Time) (*orb.SchedulingInput, error) {
-	si, err := ReconstructSampleSchedulingInput(dirPath, mostRecentBaselineFilename)
+// Similar to the above get most recent baseline, this function will get the most recent scheduling input differences.
+// The differences here those is that this is a slice of differences up to and including the SchedulingInputDifference_... file that contains the
+// reconstructTime timestamp within it's changes (it could be the first, the last or somewhere in the middle); and that it returns the slice of strings
+// of all those filenames.
+func GetDifferencesFromBaseline(dirPath string, reconstructTime time.Time, baselineTime time.Time) []string {
+	// Get all files in the directory
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
-		fmt.Println("Error reconstructing scheduling input:", err)
-		return nil, err
+		fmt.Println("Error reading directory:", err)
+		return nil
 	}
 
-	return si, nil
+	// Filter out files that don't start with "SchedulingInputDifferences"
+	var differenceFiles []string
+	regex := regexp.MustCompile(`^SchedulingInputDifferences.*\.log$`)
+	for _, file := range files {
+		if regex.MatchString(file.Name()) {
+			differenceFiles = append(differenceFiles, file.Name())
+		}
+	}
+	// If no difference files found, return an empty string
+	if len(differenceFiles) == 0 {
+		return nil
+	}
+
+	// Map each difference file to a pair of start and end times
+	fileTimesMap := map[string][]time.Time{}
+	regex = regexp.MustCompile(`_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})\.log$`)
+	for _, differenceFile := range differenceFiles {
+		match := regex.FindStringSubmatch(differenceFile)
+		if len(match) > 2 {
+			startTime, err := time.Parse("2006-01-02_15-04-05", match[1])
+			if err == nil {
+				endTime, err := time.Parse("2006-01-02_15-04-05", match[2])
+				if err == nil {
+					fileTimesMap[differenceFile] = []time.Time{startTime, endTime}
+				}
+			}
+		}
+	}
+
+	differenceFilesFromBaseline := []string{}
+	for filename, times := range fileTimesMap {
+		startTime, _ := times[0], times[1]
+		if (startTime.Equal(baselineTime) || startTime.After(baselineTime)) &&
+			(reconstructTime.Equal(startTime) || reconstructTime.After(startTime)) {
+			differenceFilesFromBaseline = append(differenceFilesFromBaseline, filename)
+		}
+	}
+	return differenceFilesFromBaseline
 }
 
-func printReconstructionToFile(dirPath string, timestamp time.Time, schedulingInput *orb.SchedulingInput) error {
+func printReconstructionToFile(dirPath string, schedulingInput *orb.SchedulingInput) error {
 	//fmt.Println("Reconstructed Scheduling Input looks like:\n" + si.String())
-	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.log", timestamp.Format("2006-01-02_15-04-05"))
+	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.log", schedulingInput.Timestamp.Format("2006-01-02_15-04-05"))
 	path := filepath.Join(dirPath, reconstructedFilename)
 	file, err := os.Create(path)
 	if err != nil {
@@ -328,14 +345,32 @@ func ReconstructSampleSchedulingInput(dirPath string, fileName string) (*orb.Sch
 		fmt.Println("Error reading from PV:", err)
 		return nil, err
 	}
-
 	si, err := orb.UnmarshalSchedulingInput(readdata)
 	if err != nil {
 		fmt.Println("Error converting PB to SI:", err)
 		return nil, err
 	}
-
 	return si, nil
+}
+
+// Function for reconstructing inputs
+// Read from the sample folder to check  from the Command Line)
+func ReconstructSampleSchedulingInputDifferences(dirPath string, fileNames []string) ([]*orb.SchedulingInputDifferences, error) {
+	allDifferences := []*orb.SchedulingInputDifferences{}
+	for _, filename := range fileNames {
+		readdata, err := ReadFromSampleFolder(dirPath, filename)
+		if err != nil {
+			fmt.Println("Error reading from PV:", err)
+			return nil, err
+		}
+		differences, err := orb.UnmarshalBatchedDifferences(readdata)
+		if err != nil {
+			fmt.Println("Error converting PB to SI:", err)
+			return nil, err
+		}
+		allDifferences = append(allDifferences, differences...)
+	}
+	return allDifferences, nil
 }
 
 // Function for reconstructing inputs

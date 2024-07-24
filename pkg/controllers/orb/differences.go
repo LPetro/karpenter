@@ -236,17 +236,17 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 	}
 
 	// Iterate over the baseline, making each time's set of changes
-	for _, time := range sortedBatchedTimes {
+	for _, differencesTime := range sortedBatchedTimes {
 		// Stop if we've gotten to differences occuring after the time for when we're reconstructing.
-		if reconstructTime.Before(time) {
+		if differencesTime.After(reconstructTime) {
 			break
 		}
 
 		// Merge the cross sections with the baseline
 		mergeSchedulingInputs(mergedInputs, &SchedulingInputDifferences{
-			Added:   batchedAdded[time],
-			Removed: batchedRemoved[time],
-			Changed: batchedChanged[time],
+			Added:   batchedAdded[differencesTime],
+			Removed: batchedRemoved[differencesTime],
+			Changed: batchedChanged[differencesTime],
 		})
 	}
 	return mergedInputs
