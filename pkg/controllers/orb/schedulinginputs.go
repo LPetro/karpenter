@@ -519,8 +519,8 @@ func protoNodePoolInstanceTypes(nodePoolInstanceTypes map[string][]string) *pb.N
 	npitProto := &pb.NodePoolsToInstanceTypes{}
 	for nodePool, instanceTypeNames := range nodePoolInstanceTypes {
 		npitProto.Nodepoolstoinstancetypes = append(npitProto.Nodepoolstoinstancetypes, &pb.NodePoolsToInstanceTypes_NodePoolToInstanceTypes{
-			Nodepool:          nodePool,
-			InstancetypeNames: instanceTypeNames,
+			Nodepool:         nodePool,
+			InstancetypeName: instanceTypeNames,
 		})
 	}
 	return npitProto
@@ -529,7 +529,7 @@ func protoNodePoolInstanceTypes(nodePoolInstanceTypes map[string][]string) *pb.N
 func reconstructNodePoolInstanceTypes(npitProto *pb.NodePoolsToInstanceTypes) map[string][]string {
 	nodePoolInstanceTypes := map[string][]string{}
 	for _, npit := range npitProto.Nodepoolstoinstancetypes {
-		nodePoolInstanceTypes[npit.Nodepool] = npit.InstancetypeNames
+		nodePoolInstanceTypes[npit.Nodepool] = npit.InstancetypeName
 	}
 	return nodePoolInstanceTypes
 }

@@ -103,6 +103,6 @@ message NodePoolsToInstanceTypes {
 
   message NodePoolToInstanceTypes {
     string nodepool = 1;
-    repeated string instancetype_names = 2;
+    repeated string instancetype_name = 2;
   }
 }

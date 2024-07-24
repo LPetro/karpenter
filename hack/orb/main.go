@@ -124,14 +124,11 @@ func resimulateFromOption(timestamp time.Time, dirPath string) {
 
 	// reconstructedDifferences := []*orb.SchedulingInputDifferences{}
 
-	// Resimulate from this scheduling input
-	ctx := signals.NewContext()
-	p := provisioning.NewProvisioner(kubeClient, nil, cloudProvider, cluster, nil, nil)
-	scheduler, err := provisioner.NewScheduler(ctx, pods, stateNodes)
-	if err != nil {
-		return pscheduling.Results{}, fmt.Errorf("creating scheduler, %w", err)
-	}
-	results := scheduler.Solve(ctx, pods)
+	// // Resimulate from this scheduling input
+	// ctx := signals.NewContext()
+
+	// p := scheduler.NewScheduler()
+	// results := scheduler.Solve(ctx, pods)
 
 	// fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
 }
@@ -180,6 +177,9 @@ func GetMostRecentBaseline(reconstructTime time.Time, dirPath string) string {
 	if len(baselineFiles) == 0 {
 		return ""
 	}
+
+	fmt.Println("Looking for this timestamp: ", reconstructTime.Format("2006-01-02_15-04-05"))
+
 	// For baseline files that do start with that, after Baseline there should be _ then a timestamp formated as "2006-01-02 15-04-05"
 	// Parse each of those timestamps from all these files and make a slice of timestamps
 	timestamps := []time.Time{}

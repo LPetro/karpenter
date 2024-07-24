@@ -55,6 +55,7 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 	return &Controller{
 		schedulingInputHeap:    schedulingInputHeap,
 		schedulingMetadataHeap: schedulingMetadataHeap,
+		mostRecentBaseline:     nil,
 		shouldRebaseline:       true,
 		rebaselineThreshold:    initialDeltaThreshold,
 	}
