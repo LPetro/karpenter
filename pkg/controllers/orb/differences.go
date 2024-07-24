@@ -515,19 +515,19 @@ func diffBindings(old, new map[types.NamespacedName]string) BindingDifferences {
 	}
 
 	// Find the changed or removed bindings
-	for k, v := range old {
-		if newVal, ok := new[k]; ok {
-			if v != newVal {
-				diff.Changed[k] = newVal
+	for namespacedName, binding := range old {
+		if newBinding, ok := new[namespacedName]; ok {
+			if binding != newBinding {
+				diff.Changed[namespacedName] = newBinding
 			}
 		} else {
-			diff.Removed[k] = v
+			diff.Removed[namespacedName] = binding
 		}
 	}
 	// Find the added bindings
-	for k, v := range new {
-		if _, ok := old[k]; !ok {
-			diff.Added[k] = v
+	for namespacedName, binding := range new {
+		if _, ok := old[namespacedName]; !ok {
+			diff.Added[namespacedName] = binding
 		}
 	}
 	return diff
@@ -579,19 +579,19 @@ func diffNodePoolsToInstanceTypes(old, new map[string][]string) NodePoolsToInsta
 	}
 
 	// Find the changed or removed node pools
-	for k, v := range old {
-		if newVal, ok := new[k]; ok {
-			if !equality.Semantic.DeepEqual(v, newVal) {
-				diff.Changed[k] = newVal
+	for nodepool, instancetypes := range old {
+		if newInstanceTypes, ok := new[nodepool]; ok {
+			if !equality.Semantic.DeepEqual(sets.NewString(instancetypes...), sets.NewString(newInstanceTypes...)) {
+				diff.Changed[nodepool] = newInstanceTypes
 			}
 		} else {
-			diff.Removed[k] = v
+			diff.Removed[nodepool] = instancetypes
 		}
 	}
 	// Find the added node pools
-	for k, v := range new {
-		if _, ok := old[k]; !ok {
-			diff.Added[k] = v
+	for nodepool, instancetypes := range new {
+		if _, ok := old[nodepool]; !ok {
+			diff.Added[nodepool] = instancetypes
 		}
 	}
 	return diff

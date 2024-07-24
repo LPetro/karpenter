@@ -84,7 +84,7 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
 	fmt.Println()
 
-	return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+	return reconcile.Result{RequeueAfter: time.Second * 30}, nil
 }
 
 func (c *Controller) Register(_ context.Context, m manager.Manager) error {
