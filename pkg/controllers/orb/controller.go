@@ -50,6 +50,7 @@ type Controller struct {
 	rebaselineThreshold    float32                 // The percentage threshold (between 0 and 1)
 	deltaToBaselineAvg     float32                 // The average delta to the baseline, moving average
 	shouldRebaseline       bool                    // Whether or not we should rebaseline (when the threshold is crossed)
+	savedDaemonSetPods     bool                    // One-time save of daemonset pods to Json at the first reconcile. Assumes they are relatively static
 }
 
 func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataHeap *SchedulingMetadataHeap) *Controller {
@@ -59,6 +60,7 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 		mostRecentBaseline:     nil,
 		shouldRebaseline:       true,
 		rebaselineThreshold:    initialDeltaThreshold,
+		savedDaemonSetPods:     false,
 	}
 }
 

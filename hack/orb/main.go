@@ -1,8 +1,24 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package main
 
 import (
 	"bufio"
-	"encoding/json"
+	"container/heap"
 	"flag"
 	"fmt"
 	"io"
@@ -16,10 +32,20 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	_ "knative.dev/pkg/system/testing"
+	"sigs.k8s.io/karpenter/hack/orb/pkg"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 )
 
+var (
+	logPath               string // Points to where the logs are stored (whether from the user's PV or some local save of the files)
+	nodepoolsYamlFilepath string
+	// TODO: Mount PV for access locally, if desired. (Or could leave that to a given customer?)
+)
+
+// Options of all the scheduling actions for the user to choose off the command-line.
+// The scheduling inputs from the associated action is reconstructed based on the timestamp reference.
 type SchedulingMetadataOption struct {
 	ID        int
 	Action    string
@@ -30,30 +56,50 @@ func (o *SchedulingMetadataOption) String() string {
 	return fmt.Sprintf("%d. %s (%s)", o.ID, o.Action, o.Timestamp.Format("2006-01-02_15-04-05"))
 }
 
-func main() {
-	dirPath := parseCommandLineArgs()
-	options := readMetadataLogs(dirPath)
-	selectedOption := promptUserForOption(options)
-
-	fmt.Printf("Pulling option: %s from this directory: %s\n", selectedOption, dirPath)
-
-	resimulateFromOption(dirPath, selectedOption.Timestamp)
-}
-
-func parseCommandLineArgs() string {
-	dirPath := flag.String("dir", "", "Path to the directory containing logs")
+// Parse the command line arguments
+func init() {
+	flag.StringVar(&logPath, "dir", "", "Path to the directory containing logs")
+	flag.StringVar(&nodepoolsYamlFilepath, "yaml", "", "Path to the YAML file containing NodePool definitions")
 	flag.Parse()
-	return *dirPath
 }
 
-func readMetadataLogs(dirPath string) []*SchedulingMetadataOption {
-	// Read metadata log file and extract available options
+// This conducts ORB Reconstruction from the command-line.
+func main() {
+	options, err := readMetadataLogs()
+	if err != nil {
+		fmt.Println("Error reading metadata logs:", err)
+		return
+	}
+	selectedOption := promptUserForOption(options)
+	fmt.Printf("Pulling option: %s from this directory: %s\n", selectedOption, logPath) // Delete later
+	reconstructedSchedulingInput, err := reconstructFromOption(selectedOption.Timestamp)
+	if err != nil {
+		fmt.Println("Error reconstructing scheduling input:", err)
+		return
+	}
+	writeReconstructionToJSON(reconstructedSchedulingInput)
 
-	// Using OS. functions, get all filenames starting with "SchedulingMetadata" within the dirPath provided
-	files, err := os.ReadDir(dirPath)
+	/* (Above) Original Scope: Log trace information important to Provisioning and Disruption as a start for troubleshooting */
+	/* ----------------------- */
+	/* (Below) Stretch Goal:   Have the tool resimulate and compare to the original results */
+
+	results, err := pkg.Resimulate(reconstructedSchedulingInput, nodepoolsYamlFilepath)
+	if err != nil {
+		fmt.Println("Error resimulating:", err)
+		return
+	}
+	fmt.Println("Results are:", results)
+
+	// TODO: Compare these results with the original results' set of nodeclaims / nodeclaim returned from EC2Fleet...
+}
+
+// Read all metadata log files and extract available options
+func readMetadataLogs() ([]*SchedulingMetadataOption, error) {
+	// Get all filenames starting with "SchedulingMetadata" within the dirPath provided
+	files, err := os.ReadDir(logPath)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
-		return nil
+		return nil, err
 	}
 	// Filter out files that don't start with "SchedulingMetadata"
 	var metadataFiles []string
@@ -68,12 +114,12 @@ func readMetadataLogs(dirPath string) []*SchedulingMetadataOption {
 	// For each metadataFile, read its contents, deserialize from protobuf and save into it's orb.Metadata structure
 	// Then, extract the options from the Metadata structure and return them as a slice of strings
 	options := []*SchedulingMetadataOption{}
-	allMetadata := *orb.NewSchedulingMetadataHeap()
+	allMetadata := orb.NewSchedulingMetadataHeap()
 	for _, metadataFile := range metadataFiles {
-		contents, err := ReadFromSampleFolder(dirPath, metadataFile)
+		contents, err := ReadLog(metadataFile)
 		if err != nil {
 			fmt.Println("Error reading file contents:", err)
-			return nil
+			return nil, err
 		}
 
 		// Unmarshal the metadataLogdata back into the metadatamap
@@ -85,14 +131,14 @@ func readMetadataLogs(dirPath string) []*SchedulingMetadataOption {
 		// Then, append that option to the options slice
 		for metadataHeap.Len() > 0 {
 			// Recombine/order all metadata from multiple files
-			allMetadata.Push(metadataHeap.Pop().(orb.SchedulingMetadata))
+			heap.Push(allMetadata, heap.Pop(metadataHeap).(orb.SchedulingMetadata))
 		}
 	}
 
-	for i, metadata := range allMetadata {
+	for i, metadata := range *allMetadata {
 		options = append(options, &SchedulingMetadataOption{ID: i, Action: metadata.Action, Timestamp: metadata.Timestamp})
 	}
-	return options
+	return options, nil
 }
 
 func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadataOption {
@@ -106,47 +152,34 @@ func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadat
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 0 || choice > len(options) {
-		fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options))
-		// fmt.Printf("You selected %s, but for testing I'm running just the first one\n", input)
+	if err != nil || choice < 0 || choice >= len(options) {
+		fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
 		return promptUserForOption(options)
 	}
 	return options[choice]
 }
 
-func resimulateFromOption(dirPath string, reconstructTime time.Time) {
-	baselineFilename, differencesFilenames := GetReconstructionFiles(dirPath, reconstructTime)
+func reconstructFromOption(reconstructTime time.Time) (*orb.SchedulingInput, error) {
+	baselineFilename, differencesFilenames := GetReconstructionFiles(reconstructTime)
 	fmt.Println("Finding baseline file: ", baselineFilename)
-	reconstructedBaseline, err := ReconstructSampleSchedulingInput(dirPath, baselineFilename)
+	reconstructedBaseline, err := ReconstructSchedulingInput(baselineFilename)
 	if err != nil {
 		fmt.Println("Error executing option:", err)
-		return
+		return nil, err
 	}
 
-	reconstructedDifferences, err := ReconstructSampleSchedulingInputDifferences(dirPath, differencesFilenames)
+	reconstructedDifferences, err := ReconstructDifferences(differencesFilenames)
 	if err != nil {
 		fmt.Println("Error reconstructing scheduling input differences", err)
-		return
+		return nil, err
 	}
 
-	reconstructedSchedulingInput := orb.MergeDifferences(reconstructedBaseline, reconstructedDifferences, reconstructTime)
-
-	// Debug print reconstruction to file as string
-	printReconstructionToFile(dirPath, reconstructedSchedulingInput)
-
-	// // Resimulate from this scheduling input
-	// ctx := signals.NewContext()
-
-	// p := scheduler.NewScheduler()
-	// results := scheduler.Solve(ctx, pods)
-
-	// fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
+	return orb.MergeDifferences(reconstructedBaseline, reconstructedDifferences, reconstructTime), nil
 }
 
-// Function to pull from a sample folder
-// TODO Just for demo, change later as necessary
-func ReadFromSampleFolder(dirPath string, logname string) ([]byte, error) {
-	path := filepath.Join(dirPath, sanitizePath(logname))
+// Function to pull from a directory (either a PV or a local log folder)
+func ReadLog(logname string) ([]byte, error) {
+	path := filepath.Join(logPath, sanitizePath(logname))
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -164,22 +197,20 @@ func ReadFromSampleFolder(dirPath string, logname string) ([]byte, error) {
 
 // This function tests whether we can read from the PV and reconstruct the data
 
-/* These will be part of the command-line printing representation... */
-
 // Function to get the files which will reconstruct a scheduling input based on a target "reconstructTime"
 // This includes getting the the most recent baseline and the list of differences. It will return that as a tuple (string, []string)
-func GetReconstructionFiles(dirPath string, reconstructTime time.Time) (string, []string) {
-	baselineName, baselineTime := GetMostRecentBaseline(dirPath, reconstructTime)
-	differences := GetDifferencesFromBaseline(dirPath, reconstructTime, baselineTime)
+func GetReconstructionFiles(reconstructTime time.Time) (string, []string) {
+	baselineName, baselineTime := GetMostRecentBaseline(reconstructTime)
+	differences := GetDifferencesFromBaseline(reconstructTime, baselineTime)
 	return baselineName, differences
 }
 
 // Function to get the differences between the scheduling input and the baseline
 
 // Based on a passed in time (time.Time), get the most recent Baseline filename from a list of filenames
-func GetMostRecentBaseline(dirPath string, reconstructTime time.Time) (string, time.Time) {
+func GetMostRecentBaseline(reconstructTime time.Time) (string, time.Time) {
 	// Get all files in the directory
-	files, err := os.ReadDir(dirPath)
+	files, err := os.ReadDir(logPath)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
 		return "", time.Time{}
@@ -236,9 +267,9 @@ func GetMostRecentBaseline(dirPath string, reconstructTime time.Time) (string, t
 // The differences here those is that this is a slice of differences up to and including the SchedulingInputDifference_... file that contains the
 // reconstructTime timestamp within it's changes (it could be the first, the last or somewhere in the middle); and that it returns the slice of strings
 // of all those filenames.
-func GetDifferencesFromBaseline(dirPath string, reconstructTime time.Time, baselineTime time.Time) []string {
+func GetDifferencesFromBaseline(reconstructTime time.Time, baselineTime time.Time) []string {
 	// Get all files in the directory
-	files, err := os.ReadDir(dirPath)
+	files, err := os.ReadDir(logPath)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
 		return nil
@@ -284,10 +315,9 @@ func GetDifferencesFromBaseline(dirPath string, reconstructTime time.Time, basel
 	return differenceFilesFromBaseline
 }
 
-func printReconstructionToFile(dirPath string, schedulingInput *orb.SchedulingInput) error {
-	//fmt.Println("Reconstructed Scheduling Input looks like:\n" + si.String())
-	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.log", schedulingInput.Timestamp.Format("2006-01-02_15-04-05"))
-	path := filepath.Join(dirPath, reconstructedFilename)
+func writeReconstructionToJSON(schedulingInput *orb.SchedulingInput) error {
+	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.json", schedulingInput.Timestamp.Format("2006-01-02_15-04-05"))
+	path := filepath.Join(logPath, reconstructedFilename)
 	file, err := os.Create(path)
 	if err != nil {
 		fmt.Println("Error creating file:", err)
@@ -295,52 +325,18 @@ func printReconstructionToFile(dirPath string, schedulingInput *orb.SchedulingIn
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(schedulingInput.String())
+	_, err = file.WriteString(schedulingInput.Json())
 	if err != nil {
 		fmt.Println("Error writing reconstruction to file:", err)
 		return err
 	}
-
 	fmt.Println("Reconstruction written to file successfully!")
 	return nil
 }
 
-// We're sort of artificially rebuilding the filename here, just to do a loopback test of sorts.
-// In reality, we could just pull a file from a known directory, for known filename schemas in certain time ranges
-func ReadPVandReconstruct(timestamp time.Time) error {
-	timestampStr := timestamp.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
-
-	si, err := ReconstructSchedulingInput(fileName)
-	if err != nil {
-		fmt.Println("Error reconstructing scheduling input:", err)
-		return err
-	}
-
-	fmt.Println("Reconstructed Scheduling Input looks like:\n" + si.String())
-	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.log", timestampStr)
-	path := filepath.Join("/data", reconstructedFilename)
-	file, err := os.Create(path)
-	if err != nil {
-		fmt.Println("Error creating file:", err)
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString(si.String())
-	if err != nil {
-		fmt.Println("Error writing reconstruction to file:", err)
-		return err
-	}
-
-	fmt.Println("Reconstruction written to file successfully!")
-	return nil
-}
-
-// Function for reconstructing inputs
-// Read from the sample folder to check  from the Command Line)
-func ReconstructSampleSchedulingInput(dirPath string, fileName string) (*orb.SchedulingInput, error) {
-	readdata, err := ReadFromSampleFolder(dirPath, fileName)
+// Reconstructs the scheduling input from a log file in PV or local folder
+func ReconstructSchedulingInput(fileName string) (*orb.SchedulingInput, error) {
+	readdata, err := ReadLog(fileName)
 	if err != nil {
 		fmt.Println("Error reading from PV:", err)
 		return nil, err
@@ -353,12 +349,11 @@ func ReconstructSampleSchedulingInput(dirPath string, fileName string) (*orb.Sch
 	return si, nil
 }
 
-// Function for reconstructing inputs
-// Read from the sample folder to check  from the Command Line)
-func ReconstructSampleSchedulingInputDifferences(dirPath string, fileNames []string) ([]*orb.SchedulingInputDifferences, error) {
+// Function for reconstructing inputs' differences
+func ReconstructDifferences(fileNames []string) ([]*orb.SchedulingInputDifferences, error) {
 	allDifferences := []*orb.SchedulingInputDifferences{}
 	for _, filename := range fileNames {
-		readdata, err := ReadFromSampleFolder(dirPath, filename)
+		readdata, err := ReadLog(filename)
 		if err != nil {
 			fmt.Println("Error reading from PV:", err)
 			return nil, err
@@ -373,42 +368,6 @@ func ReconstructSampleSchedulingInputDifferences(dirPath string, fileNames []str
 	return allDifferences, nil
 }
 
-// Function for reconstructing inputs
-// Read from the PV to check (will be what the ORB tool does from the Command Line)
-func ReconstructSchedulingInput(fileName string) (*orb.SchedulingInput, error) {
-	readdata, err := ReadFromPV(fileName)
-	if err != nil {
-		fmt.Println("Error reading from PV:", err)
-		return nil, err
-	}
-
-	si, err := orb.UnmarshalSchedulingInput(readdata)
-	if err != nil {
-		fmt.Println("Error converting PB to SI:", err)
-		return nil, err
-	}
-
-	return si, nil
-}
-
-// Function to pull from an S3 bucket
-func ReadFromPV(logname string) ([]byte, error) {
-	path := filepath.Join("/data", sanitizePath(logname))
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil, err
-	}
-	defer file.Close()
-
-	contents, err := io.ReadAll(file)
-	if err != nil {
-		fmt.Println("Error reading file bytes:", err)
-		return nil, err
-	}
-	return contents, nil
-}
-
 // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
 // They highly recommend sanitizing inputs before accessing that path.
 func sanitizePath(path string) string {
@@ -420,47 +379,4 @@ func sanitizePath(path string) string {
 	path = strings.ReplaceAll(path, "../", "")
 
 	return path
-}
-
-func DebugWriteSchedulingInputStringToLogFile(item *orb.SchedulingInput, timestampStr string) error {
-	fileNameStringtest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.log", timestampStr)
-	pathStringtest := filepath.Join("/data", fileNameStringtest)
-	file, err := os.Create(pathStringtest)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString(item.String())
-	if err != nil {
-		fmt.Println("Error writing data to file:", err)
-		return err
-	}
-
-	return nil
-}
-
-func DebugWriteSchedulingInputToJSONFile(item *orb.SchedulingInput, timestampStr string) error {
-	fileNameJSONtest := fmt.Sprintf("SchedulingInputBaselineTEST_%s.json", timestampStr)
-	pathJSONtest := filepath.Join("/data", fileNameJSONtest)
-	file, err := os.Create(pathJSONtest)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer file.Close()
-
-	jsondata, err := json.Marshal(item)
-	if err != nil {
-		fmt.Println("Error marshalling data to JSON:", err)
-		return err
-	}
-	_, err = file.Write(jsondata)
-	if err != nil {
-		fmt.Println("Error writing data to file:", err)
-		return err
-	}
-
-	return nil
 }

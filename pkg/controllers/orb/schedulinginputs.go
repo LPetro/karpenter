@@ -18,6 +18,7 @@ package orb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -33,16 +34,19 @@ import (
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/scheduling"
+	"sigs.k8s.io/karpenter/pkg/utils/pretty"
 )
+
+type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshal definition
 
 // These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
 type SchedulingInput struct {
-	Timestamp             time.Time
-	PendingPods           []*v1.Pod
-	StateNodesWithPods    []*StateNodeWithPods
-	Bindings              map[types.NamespacedName]string
-	AllInstanceTypes      []*cloudprovider.InstanceType
-	NodePoolInstanceTypes map[string][]string
+	Timestamp             time.Time                     `json:"timestamp"`
+	PendingPods           []*v1.Pod                     `json:"pendingPods"`
+	StateNodesWithPods    []*StateNodeWithPods          `json:"stateNodesWithPods"`
+	Bindings              BindingsMap                   `json:"bindings"`
+	AllInstanceTypes      []*cloudprovider.InstanceType `json:"allInstanceTypes"`
+	NodePoolInstanceTypes map[string][]string           `json:"nodePoolInstanceTypes"`
 }
 
 // A stateNode with the Pods it has on it.
@@ -94,6 +98,18 @@ func (si SchedulingInput) String() string {
 	return protoSchedulingInput(&si).String()
 }
 
+func (si SchedulingInput) Json() string {
+	return pretty.Concise(si)
+}
+
+func (m BindingsMap) MarshalJSON() ([]byte, error) {
+	temp := map[string]interface{}{}
+	for k, v := range m {
+		temp[k.String()] = v
+	}
+	return json.Marshal(temp)
+}
+
 func (si *SchedulingInput) isEmpty() bool {
 	return len(si.PendingPods) == 0 &&
 		len(si.StateNodesWithPods) == 0 &&
@@ -124,7 +140,7 @@ func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprov
 	allInstanceTypesNameMap := map[string]*cloudprovider.InstanceType{}
 	nodePoolToInstanceTypes := map[string][]string{}
 	for nodePool, instanceTypeSlice := range instanceTypes {
-		instanceTypeSliceNameMap := mapInstanceTypesByName(instanceTypeSlice)
+		instanceTypeSliceNameMap := MapInstanceTypesByName(instanceTypeSlice)
 		for instanceTypeName, instanceType := range instanceTypeSliceNameMap {
 			allInstanceTypesNameMap[instanceTypeName] = instanceType
 		}

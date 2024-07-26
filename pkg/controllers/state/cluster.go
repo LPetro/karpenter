@@ -597,3 +597,9 @@ func (c *Cluster) GetBindings() map[types.NamespacedName]string {
 	maps.Copy(bindings, c.bindings)
 	return bindings
 }
+
+func (c *Cluster) SetBindings(bindings map[types.NamespacedName]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.bindings = bindings
+}

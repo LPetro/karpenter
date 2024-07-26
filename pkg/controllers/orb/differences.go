@@ -345,7 +345,7 @@ func mergeBindings(iteratingBindings map[types.NamespacedName]string, difference
 
 // Helper function to merge the baseline instanceTypes with the set of differences.
 func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, differences *SchedulingInputDifferences) []*cloudprovider.InstanceType {
-	iteratingInstanceTypesMap := mapInstanceTypesByName(iteratingInstanceTypes)
+	iteratingInstanceTypesMap := MapInstanceTypesByName(iteratingInstanceTypes)
 
 	// Add, remove and change instanceTypes from the iterating instanceTypes
 	if differences.Added != nil && !differences.Added.isEmpty() {
@@ -534,7 +534,7 @@ func diffBindings(old, new map[types.NamespacedName]string) BindingDifferences {
 }
 
 // Take differenceTypes to map like above, by name
-func mapInstanceTypesByName(instanceTypes []*cloudprovider.InstanceType) map[string]*cloudprovider.InstanceType {
+func MapInstanceTypesByName(instanceTypes []*cloudprovider.InstanceType) map[string]*cloudprovider.InstanceType {
 	itMap := map[string]*cloudprovider.InstanceType{}
 	for _, it := range instanceTypes {
 		itMap[it.Name] = it
@@ -550,9 +550,9 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 		Changed: []*cloudprovider.InstanceType{},
 	}
 
-	oldTypeMap := mapInstanceTypesByName(oldTypes)
+	oldTypeMap := MapInstanceTypesByName(oldTypes)
 	oldTypeSet := sets.KeySet(oldTypeMap)
-	newTypeMap := mapInstanceTypesByName(newTypes)
+	newTypeMap := MapInstanceTypesByName(newTypes)
 	newTypeSet := sets.KeySet(newTypeMap)
 
 	// Find the added, removed and changed instanceTypes
