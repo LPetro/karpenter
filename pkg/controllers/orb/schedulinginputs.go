@@ -566,8 +566,8 @@ func protoDaemonSetPods(daemonSetPods []*v1.Pod) []byte {
 	podList := &v1.PodList{
 		Items: []v1.Pod{},
 	}
-	for i, pod := range daemonSetPods {
-		podList.Items[i] = *pod
+	for _, pod := range daemonSetPods {
+		podList.Items = append(podList.Items, *pod)
 	}
 
 	dspData, err := podList.Marshal()
@@ -576,7 +576,6 @@ func protoDaemonSetPods(daemonSetPods []*v1.Pod) []byte {
 		return nil
 	}
 	return dspData
-
 }
 
 func reconstructDaemonSetPods(dspData []byte) []*v1.Pod {
@@ -585,8 +584,8 @@ func reconstructDaemonSetPods(dspData []byte) []*v1.Pod {
 
 	daemonSetPods := []*v1.Pod{}
 
-	for i, pod := range podList.Items {
-		daemonSetPods[i] = &pod
+	for _, pod := range podList.Items {
+		daemonSetPods = append(daemonSetPods, &pod)
 	}
 	return daemonSetPods
 }
