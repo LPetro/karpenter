@@ -39,6 +39,7 @@ import (
 )
 
 type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshal definition
+type Topology *scheduler.Topology                // Alias for JSON Marshaling
 
 // These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
 type SchedulingInput struct {
@@ -49,6 +50,7 @@ type SchedulingInput struct {
 	AllInstanceTypes      []*cloudprovider.InstanceType
 	NodePoolInstanceTypes map[string][]string
 	Topology              *scheduler.Topology
+	DaemonSetPods         []*v1.Pod
 }
 
 // A stateNode with the Pods it has on it.
@@ -58,9 +60,27 @@ type StateNodeWithPods struct {
 	Pods      []*v1.Pod
 }
 
+// // These are the fields of topology not associated with the kubeClient or Cluster.
+// type IsolatedTopology struct {
+// 	// Both the topologies and inverseTopologies are maps of the hash from TopologyGroup.Hash() to the topology group
+// 	// itself. This is used to allow us to store one topology group that tracks the topology of many pods instead of
+// 	// having a 1<->1 mapping between topology groups and pods owned/selected by that group.
+// 	topologies map[uint64]*scheduler.TopologyGroup
+// 	// Anti-affinity works both ways (if a zone has a pod foo with anti-affinity to a pod bar, we can't schedule bar to
+// 	// that zone, even though bar has no anti affinity terms on it. For this to work, we need to separately track the
+// 	// topologies of pods with anti-affinity terms, so we can prevent scheduling the pods they have anti-affinity to
+// 	// in some cases.
+// 	inverseTopologies map[uint64]*scheduler.TopologyGroup
+// 	// The universe of domains by topology key
+// 	domains map[string]sets.Set[string]
+// 	// excludedPods are the pod UIDs of pods that are excluded from counting.  This is used so we can simulate
+// 	// moving pods to prevent them from being double counted.
+// 	excludedPods sets.Set[string]
+// }
+
 // Construct and reduce the Scheduling Input down to what's minimally required for re-simulation
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod, stateNodes []*state.StateNode,
-	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology) SchedulingInput {
+	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) SchedulingInput {
 	allInstanceTypes, nodePoolInstanceTypes := getAllInstanceTypesAndNodePoolMapping(instanceTypes)
 	return SchedulingInput{
 		Timestamp:             scheduledTime,
@@ -70,11 +90,12 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		AllInstanceTypes:      allInstanceTypes,
 		NodePoolInstanceTypes: nodePoolInstanceTypes,
 		Topology:              topology,
+		DaemonSetPods:         daemonSetPods,
 	}
 }
 
 func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods, bindings map[types.NamespacedName]string,
-	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology) *SchedulingInput {
+	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology, daemonSetPods []*v1.Pod) *SchedulingInput {
 	return &SchedulingInput{
 		Timestamp:             timestamp,
 		PendingPods:           pendingPods,
@@ -83,6 +104,7 @@ func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod,
 		AllInstanceTypes:      instanceTypes,
 		NodePoolInstanceTypes: nodePoolInstanceTypes,
 		Topology:              topology,
+		DaemonSetPods:         daemonSetPods,
 	}
 }
 
@@ -278,7 +300,8 @@ func protoSchedulingInput(si *SchedulingInput) *pb.SchedulingInput {
 		StatenodesData:               protoStateNodesWithPods(si.StateNodesWithPods),
 		InstancetypesData:            protoInstanceTypes(si.AllInstanceTypes),
 		NodepoolstoinstancetypesData: protoNodePoolInstanceTypes(si.NodePoolInstanceTypes),
-		Topology:                     protoTopology(si.Topology),
+		TopologyData:                 protoTopology(si.Topology),
+		DaemonsetpodsData:            protoDaemonSetPods(si.DaemonSetPods),
 	}
 }
 
@@ -295,7 +318,8 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		reconstructBindings(pbsi.GetBindingsData()),
 		reconstructInstanceTypes(pbsi.GetInstancetypesData()),
 		reconstructNodePoolInstanceTypes(pbsi.GetNodepoolstoinstancetypesData()),
-		reconstructTopology(pbsi.GetTopology()),
+		reconstructTopology(pbsi.GetTopologyData()),
+		reconstructDaemonSetPods(pbsi.GetDaemonsetpodsData()),
 	), nil
 }
 
@@ -526,6 +550,7 @@ func reconstructNodePoolInstanceTypes(npitProto *pb.NodePoolsToInstanceTypes) ma
 func protoTopology(topology *scheduler.Topology) []byte {
 	topologyData, err := json.Marshal(topology)
 	if err != nil {
+		fmt.Println("Error marshaling topology to JSON", err)
 		return nil
 	}
 	return topologyData
@@ -535,4 +560,33 @@ func reconstructTopology(topologyData []byte) *scheduler.Topology {
 	topology := &scheduler.Topology{}
 	json.Unmarshal(topologyData, topology)
 	return topology
+}
+
+func protoDaemonSetPods(daemonSetPods []*v1.Pod) []byte {
+	podList := &v1.PodList{
+		Items: []v1.Pod{},
+	}
+	for i, pod := range daemonSetPods {
+		podList.Items[i] = *pod
+	}
+
+	dspData, err := podList.Marshal()
+	if err != nil {
+		fmt.Println("Error marshaling DaemonSetPods to JSON", err)
+		return nil
+	}
+	return dspData
+
+}
+
+func reconstructDaemonSetPods(dspData []byte) []*v1.Pod {
+	podList := &v1.PodList{}
+	podList.Unmarshal(dspData)
+
+	daemonSetPods := []*v1.Pod{}
+
+	for i, pod := range podList.Items {
+		daemonSetPods[i] = &pod
+	}
+	return daemonSetPods
 }

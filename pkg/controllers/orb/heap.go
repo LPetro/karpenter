@@ -65,9 +65,9 @@ func NewSchedulingInputHeap() *SchedulingInputHeap {
 }
 
 // Function for logging scheduling inputs to the Provisioner Scheduler. Batches via a min-heap, ordered by least recent.
-func (h *SchedulingInputHeap) LogSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
-	pods []*v1.Pod, stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology) {
-	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes, topology)
+func (h *SchedulingInputHeap) LogSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pods []*v1.Pod, stateNodes []*state.StateNode,
+	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) {
+	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes, topology, daemonSetPods)
 	si.Reduce()
 	heap.Push(h, si)
 }

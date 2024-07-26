@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 
@@ -271,4 +272,31 @@ func (t *TopologyGroup) selects(pod *v1.Pod) bool {
 		selector = labels.Nothing()
 	}
 	return t.namespaces.Has(pod.Namespace) && selector.Matches(labels.Set(pod.Labels))
+}
+
+// This function marshal a TopologyGroup as a JSON
+func (t *TopologyGroup) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Key          string
+		Type         TopologyType
+		maxSkew      int32
+		minDomains   *int32
+		namespaces   sets.Set[string]
+		selector     *metav1.LabelSelector
+		nodeFilter   TopologyNodeFilter
+		owners       map[types.UID]struct{}
+		domains      map[string]int32
+		emptyDomains sets.Set[string]
+	}{
+		Key:          t.Key,
+		Type:         t.Type,
+		maxSkew:      t.maxSkew,
+		minDomains:   t.minDomains,
+		namespaces:   t.namespaces,
+		selector:     t.selector,
+		nodeFilter:   t.nodeFilter,
+		owners:       t.owners,
+		domains:      t.domains,
+		emptyDomains: t.emptyDomains,
+	})
 }
