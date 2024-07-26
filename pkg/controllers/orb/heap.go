@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
+	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 )
 
@@ -65,8 +66,8 @@ func NewSchedulingInputHeap() *SchedulingInputHeap {
 
 // Function for logging scheduling inputs to the Provisioner Scheduler. Batches via a min-heap, ordered by least recent.
 func (h *SchedulingInputHeap) LogSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time,
-	pods []*v1.Pod, stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType) {
-	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes)
+	pods []*v1.Pod, stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology) {
+	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes, topology)
 	si.Reduce()
 	heap.Push(h, si)
 }

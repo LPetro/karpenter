@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
+	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -56,6 +57,10 @@ type InstanceTypeDifferences struct {
 
 type NodePoolsToInstanceTypesDifferences struct {
 	Added, Removed, Changed map[string][]string
+}
+
+type TopologyDifferences struct {
+	Added, Removed, Changed *scheduler.Topology
 }
 
 func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
@@ -233,6 +238,7 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 		Bindings:              baseline.Bindings,
 		AllInstanceTypes:      baseline.AllInstanceTypes,
 		NodePoolInstanceTypes: baseline.NodePoolInstanceTypes,
+		Topology:              baseline.Topology,
 	}
 
 	// Iterate over the baseline, making each time's set of changes
@@ -261,6 +267,7 @@ func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *Schedul
 	mergeBindings(iteratingInput.Bindings, differences) // Already a map, so can merge in place
 	iteratingInput.AllInstanceTypes = mergeInstanceTypes(iteratingInput.AllInstanceTypes, differences)
 	mergeNodePoolInstanceTypes(iteratingInput.NodePoolInstanceTypes, differences) // Already a map, so can merge in place
+	mergeTopology(iteratingInput.Topology, differences)
 }
 
 // TODO: Generalize the functions below to some interface mapping or "lo"-based helper.
@@ -391,6 +398,14 @@ func mergeNodePoolInstanceTypes(iteratingNodePoolInstanceTypes map[string][]stri
 	}
 }
 
+func mergeTopology(iteratingTopology *scheduler.Topology, differences *SchedulingInputDifferences) {
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		if differences.Changed.Topology != nil {
+			iteratingTopology = differences.Changed.Topology
+		}
+	}
+}
+
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
 func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferences {
 	// Determine the differences in each of the fields of ScheduleInput
@@ -399,6 +414,7 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferen
 	bindingsDiff := diffBindings(oldSi.Bindings, si.Bindings)
 	itDiff := diffInstanceTypes(oldSi.AllInstanceTypes, si.AllInstanceTypes)
 	npitDiff := diffNodePoolsToInstanceTypes(oldSi.NodePoolInstanceTypes, si.NodePoolInstanceTypes)
+	topologyDiff := diffTopology(oldSi.Topology, si.Topology)
 
 	diffAdded := &SchedulingInput{}
 	diffRemoved := &SchedulingInput{}
@@ -406,15 +422,15 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferen
 
 	// If there are added differences, include them
 	if len(podDiff.Added) > 0 || len(snpDiff.Added) > 0 || len(bindingsDiff.Added) > 0 || len(itDiff.Added) > 0 || len(npitDiff.Added) > 0 {
-		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added)
+		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added, topologyDiff.Added)
 		// fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
 	}
 	if len(podDiff.Removed) > 0 || len(snpDiff.Removed) > 0 || len(bindingsDiff.Removed) > 0 || len(itDiff.Removed) > 0 || len(npitDiff.Removed) > 0 {
-		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed)
+		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed, topologyDiff.Removed)
 		// fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
 	}
-	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 || len(npitDiff.Changed) > 0 {
-		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed)
+	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 || len(npitDiff.Changed) > 0 || (topologyDiff.Changed != nil) {
+		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed, topologyDiff.Changed)
 		// fmt.Println("Diff Scheduling Input changed is... ", diffChanged.String()) // Test print, delete later
 	}
 
@@ -593,6 +609,19 @@ func diffNodePoolsToInstanceTypes(old, new map[string][]string) NodePoolsToInsta
 		if _, ok := old[nodepool]; !ok {
 			diff.Added[nodepool] = instancetypes
 		}
+	}
+	return diff
+}
+
+func diffTopology(oldTopology, newTopology *scheduler.Topology) TopologyDifferences {
+	diff := TopologyDifferences{
+		Added:   nil, // Empty for Topology by construct (only coarsely checking) data structure equality, not for each recursive internal differences
+		Removed: nil, // ^
+		Changed: nil, // Only these matter, but keeping the "Differences" construct so I can (TODO) make a general interface{} later and simplify
+	}
+
+	if !structEqualJSON(oldTopology, newTopology) {
+		diff.Changed = newTopology
 	}
 	return diff
 }

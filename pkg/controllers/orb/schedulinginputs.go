@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/karpenter/pkg/apis/v1beta1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
+	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/scheduling"
 	"sigs.k8s.io/karpenter/pkg/utils/pretty"
@@ -47,6 +48,7 @@ type SchedulingInput struct {
 	Bindings              BindingsMap
 	AllInstanceTypes      []*cloudprovider.InstanceType
 	NodePoolInstanceTypes map[string][]string
+	Topology              *scheduler.Topology
 }
 
 // A stateNode with the Pods it has on it.
@@ -57,8 +59,8 @@ type StateNodeWithPods struct {
 }
 
 // Construct and reduce the Scheduling Input down to what's minimally required for re-simulation
-func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod,
-	stateNodes []*state.StateNode, bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType) SchedulingInput {
+func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod, stateNodes []*state.StateNode,
+	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology) SchedulingInput {
 	allInstanceTypes, nodePoolInstanceTypes := getAllInstanceTypesAndNodePoolMapping(instanceTypes)
 	return SchedulingInput{
 		Timestamp:             scheduledTime,
@@ -67,11 +69,12 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		Bindings:              bindings,
 		AllInstanceTypes:      allInstanceTypes,
 		NodePoolInstanceTypes: nodePoolInstanceTypes,
+		Topology:              topology,
 	}
 }
 
-func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods,
-	bindings map[types.NamespacedName]string, instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string) *SchedulingInput {
+func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods, bindings map[types.NamespacedName]string,
+	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology) *SchedulingInput {
 	return &SchedulingInput{
 		Timestamp:             timestamp,
 		PendingPods:           pendingPods,
@@ -79,6 +82,7 @@ func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod,
 		Bindings:              bindings,
 		AllInstanceTypes:      instanceTypes,
 		NodePoolInstanceTypes: nodePoolInstanceTypes,
+		Topology:              topology,
 	}
 }
 
@@ -197,22 +201,7 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 		if node != nil {
 			reducedStateNode := &state.StateNode{}
 			reducedStateNode.Node = node.Node
-			// if node.Node != nil {
-			// 	reducedStateNode.Node = &v1.Node{
-			// 		ObjectMeta: metav1.ObjectMeta{
-			// 			Name: node.Node.Name,
-			// 		},
-			// 		Status: node.Node.Status,
-			// 	}
-			// }
 			reducedStateNode.NodeClaim = node.NodeClaim
-			// if node.NodeClaim != nil {
-			// 	reducedStateNode.NodeClaim = &v1beta1.NodeClaim{
-			// 		ObjectMeta: metav1.ObjectMeta{
-			// 			Name: node.NodeClaim.Name,
-			// 		},
-			// 	}
-			// }
 			if reducedStateNode.Node != nil || reducedStateNode.NodeClaim != nil {
 				reducedStateNodes = append(reducedStateNodes, reducedStateNode)
 			}
@@ -289,6 +278,7 @@ func protoSchedulingInput(si *SchedulingInput) *pb.SchedulingInput {
 		StatenodesData:               protoStateNodesWithPods(si.StateNodesWithPods),
 		InstancetypesData:            protoInstanceTypes(si.AllInstanceTypes),
 		NodepoolstoinstancetypesData: protoNodePoolInstanceTypes(si.NodePoolInstanceTypes),
+		Topology:                     protoTopology(si.Topology),
 	}
 }
 
@@ -305,6 +295,7 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		reconstructBindings(pbsi.GetBindingsData()),
 		reconstructInstanceTypes(pbsi.GetInstancetypesData()),
 		reconstructNodePoolInstanceTypes(pbsi.GetNodepoolstoinstancetypesData()),
+		reconstructTopology(pbsi.GetTopology()),
 	), nil
 }
 
@@ -530,4 +521,18 @@ func reconstructNodePoolInstanceTypes(npitProto *pb.NodePoolsToInstanceTypes) ma
 		nodePoolInstanceTypes[npit.Nodepool] = npit.InstancetypeName
 	}
 	return nodePoolInstanceTypes
+}
+
+func protoTopology(topology *scheduler.Topology) []byte {
+	topologyData, err := json.Marshal(topology)
+	if err != nil {
+		return nil
+	}
+	return topologyData
+}
+
+func reconstructTopology(topologyData []byte) *scheduler.Topology {
+	topology := &scheduler.Topology{}
+	json.Unmarshal(topologyData, topology)
+	return topology
 }

@@ -21,6 +21,7 @@ message SchedulingInput {
   Bindings bindings_data = 4;
   repeated ReducedInstanceType instancetypes_data = 5;
   NodePoolsToInstanceTypes nodepoolstoinstancetypes_data = 6;
+  optional bytes topology = 7;
 }
 
 message ReducedPod {
