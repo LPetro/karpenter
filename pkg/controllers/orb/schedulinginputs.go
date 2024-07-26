@@ -373,15 +373,21 @@ func reconstructPodConditions(reducedPodConditions []*pb.ReducedPod_PodCondition
 func protoStateNodesWithPods(stateNodesWithPods []*StateNodeWithPods) []*pb.StateNodeWithPods {
 	snpData := []*pb.StateNodeWithPods{}
 	for _, snp := range stateNodesWithPods {
-		nodeData, err := snp.Node.Marshal()
-		if err != nil {
-			continue // There is no Node, maybe there's a nodeclaim
+		nodeData := []byte{}
+		err := error(nil)
+		if snp.Node != nil {
+			nodeData, err = snp.Node.Marshal()
+			if err != nil {
+				continue // There is no Node, maybe there's a nodeclaim
+			}
 		}
-		nodeClaimData, err := json.Marshal(snp.NodeClaim)
-		if err != nil {
-			continue // There is no NodeClaim
+		nodeClaimData := []byte{}
+		if snp.NodeClaim != nil {
+			nodeClaimData, err = json.Marshal(snp.NodeClaim)
+			if err != nil {
+				continue // There is no NodeClaim
+			}
 		}
-
 		snpData = append(snpData, &pb.StateNodeWithPods{
 			Node:      nodeData,
 			NodeClaim: nodeClaimData,
