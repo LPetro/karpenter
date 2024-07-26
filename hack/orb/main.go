@@ -33,6 +33,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	_ "knative.dev/pkg/system/testing"
+	"knative.dev/pkg/webhook/json"
 	"sigs.k8s.io/karpenter/hack/orb/pkg"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
@@ -341,7 +342,9 @@ func ReconstructSchedulingInput(fileName string) (*orb.SchedulingInput, error) {
 		fmt.Println("Error reading from PV:", err)
 		return nil, err
 	}
-	si, err := orb.UnmarshalSchedulingInput(readdata)
+	// Unmarshal the data back into the scheduling input
+	si := &orb.SchedulingInput{}
+	err = json.Unmarshal(readdata, si)
 	if err != nil {
 		fmt.Println("Error converting PB to SI:", err)
 		return nil, err
