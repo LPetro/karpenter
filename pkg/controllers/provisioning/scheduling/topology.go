@@ -439,18 +439,7 @@ func IgnoredForTopology(p *v1.Pod) bool {
 	return !pod.IsScheduled(p) || pod.IsTerminal(p) || pod.IsTerminating(p)
 }
 
-// Function to marshal Topology as a JSON for these four fields....
-// topologies map[uint64]*TopologyGroup
-// // Anti-affinity works both ways (if a zone has a pod foo with anti-affinity to a pod bar, we can't schedule bar to
-// // that zone, even though bar has no anti affinity terms on it. For this to work, we need to separately track the
-// // topologies of pods with anti-affinity terms, so we can prevent scheduling the pods they have anti-affinity to
-// // in some cases.
-// inverseTopologies map[uint64]*TopologyGroup
-// // The universe of domains by topology key
-// domains map[string]sets.Set[string]
-// // excludedPods are the pod UIDs of pods that are excluded from counting.  This is used so we can simulate
-// // moving pods to prevent them from being double counted.
-// excludedPods sets.Set[string]
+// Function to marshal Topology as a JSON for the four internal fields
 func (t *Topology) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Topologies        map[uint64]*TopologyGroup   `json:"topologies"`
@@ -462,4 +451,23 @@ func (t *Topology) MarshalJSON() ([]byte, error) {
 		InverseTopologies: t.inverseTopologies,
 		Domains:           t.domains,
 		ExcludedPods:      t.excludedPods})
+}
+
+// This function unmarshals back
+func (t *Topology) UnmarshalJSON(b []byte) error {
+	temp := struct {
+		Topologies        map[uint64]*TopologyGroup
+		InverseTopologies map[uint64]*TopologyGroup
+		Domains           map[string]sets.Set[string]
+		ExcludedPods      sets.Set[string]
+	}{}
+	err := json.Unmarshal(b, &temp)
+	if err != nil {
+		return err
+	}
+	t.topologies = temp.Topologies
+	t.inverseTopologies = temp.InverseTopologies
+	t.domains = temp.Domains
+	t.excludedPods = temp.ExcludedPods
+	return nil
 }
