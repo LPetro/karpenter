@@ -33,8 +33,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	_ "knative.dev/pkg/system/testing"
-	"knative.dev/pkg/webhook/json"
-	"sigs.k8s.io/karpenter/hack/orb/pkg"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 )
@@ -84,12 +82,12 @@ func main() {
 	/* ----------------------- */
 	/* (Below) Stretch Goal:   Have the tool resimulate and compare to the original results */
 
-	results, err := pkg.Resimulate(reconstructedSchedulingInput, nodepoolsYamlFilepath)
-	if err != nil {
-		fmt.Println("Error resimulating:", err)
-		return
-	}
-	fmt.Println("Results are:", results)
+	// results, err := pkg.Resimulate(reconstructedSchedulingInput, nodepoolsYamlFilepath)
+	// if err != nil {
+	// 	fmt.Println("Error resimulating:", err)
+	// 	return
+	// }
+	// fmt.Println("Results are:", results)
 
 	// TODO: Compare these results with the original results' set of nodeclaims / nodeclaim returned from EC2Fleet...
 }
@@ -342,9 +340,7 @@ func ReconstructSchedulingInput(fileName string) (*orb.SchedulingInput, error) {
 		fmt.Println("Error reading from PV:", err)
 		return nil, err
 	}
-	// Unmarshal the data back into the scheduling input
-	si := &orb.SchedulingInput{}
-	err = json.Unmarshal(readdata, si)
+	si, err := orb.UnmarshalSchedulingInput(readdata)
 	if err != nil {
 		fmt.Println("Error converting PB to SI:", err)
 		return nil, err

@@ -257,9 +257,9 @@ type StateNodeWithPods struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Node      *StateNodeWithPods_ReducedNode      `protobuf:"bytes,1,opt,name=node,proto3,oneof" json:"node,omitempty"`
-	NodeClaim *StateNodeWithPods_ReducedNodeClaim `protobuf:"bytes,2,opt,name=nodeClaim,proto3,oneof" json:"nodeClaim,omitempty"`
-	Pods      []*ReducedPod                       `protobuf:"bytes,3,rep,name=pods,proto3" json:"pods,omitempty"`
+	Node      []byte        `protobuf:"bytes,1,opt,name=node,proto3,oneof" json:"node,omitempty"`
+	NodeClaim []byte        `protobuf:"bytes,2,opt,name=nodeClaim,proto3,oneof" json:"nodeClaim,omitempty"`
+	Pods      []*ReducedPod `protobuf:"bytes,3,rep,name=pods,proto3" json:"pods,omitempty"`
 }
 
 func (x *StateNodeWithPods) Reset() {
@@ -294,14 +294,14 @@ func (*StateNodeWithPods) Descriptor() ([]byte, []int) {
 	return file_SchedulingInput_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *StateNodeWithPods) GetNode() *StateNodeWithPods_ReducedNode {
+func (x *StateNodeWithPods) GetNode() []byte {
 	if x != nil {
 		return x.Node
 	}
 	return nil
 }
 
-func (x *StateNodeWithPods) GetNodeClaim() *StateNodeWithPods_ReducedNodeClaim {
+func (x *StateNodeWithPods) GetNodeClaim() []byte {
 	if x != nil {
 		return x.NodeClaim
 	}
@@ -592,108 +592,6 @@ func (x *ReducedPod_PodCondition) GetMessage() string {
 	return ""
 }
 
-type StateNodeWithPods_ReducedNode struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Name       string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Nodestatus []byte `protobuf:"bytes,2,opt,name=nodestatus,proto3" json:"nodestatus,omitempty"`
-}
-
-func (x *StateNodeWithPods_ReducedNode) Reset() {
-	*x = StateNodeWithPods_ReducedNode{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[9]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *StateNodeWithPods_ReducedNode) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*StateNodeWithPods_ReducedNode) ProtoMessage() {}
-
-func (x *StateNodeWithPods_ReducedNode) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[9]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use StateNodeWithPods_ReducedNode.ProtoReflect.Descriptor instead.
-func (*StateNodeWithPods_ReducedNode) Descriptor() ([]byte, []int) {
-	return file_SchedulingInput_proto_rawDescGZIP(), []int{3, 0}
-}
-
-func (x *StateNodeWithPods_ReducedNode) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *StateNodeWithPods_ReducedNode) GetNodestatus() []byte {
-	if x != nil {
-		return x.Nodestatus
-	}
-	return nil
-}
-
-type StateNodeWithPods_ReducedNodeClaim struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-}
-
-func (x *StateNodeWithPods_ReducedNodeClaim) Reset() {
-	*x = StateNodeWithPods_ReducedNodeClaim{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[10]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *StateNodeWithPods_ReducedNodeClaim) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*StateNodeWithPods_ReducedNodeClaim) ProtoMessage() {}
-
-func (x *StateNodeWithPods_ReducedNodeClaim) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[10]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use StateNodeWithPods_ReducedNodeClaim.ProtoReflect.Descriptor instead.
-func (*StateNodeWithPods_ReducedNodeClaim) Descriptor() ([]byte, []int) {
-	return file_SchedulingInput_proto_rawDescGZIP(), []int{3, 1}
-}
-
-func (x *StateNodeWithPods_ReducedNodeClaim) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
 type ReducedInstanceType_ReducedRequirement struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -707,7 +605,7 @@ type ReducedInstanceType_ReducedRequirement struct {
 func (x *ReducedInstanceType_ReducedRequirement) Reset() {
 	*x = ReducedInstanceType_ReducedRequirement{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[11]
+		mi := &file_SchedulingInput_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -720,7 +618,7 @@ func (x *ReducedInstanceType_ReducedRequirement) String() string {
 func (*ReducedInstanceType_ReducedRequirement) ProtoMessage() {}
 
 func (x *ReducedInstanceType_ReducedRequirement) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[11]
+	mi := &file_SchedulingInput_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -770,7 +668,7 @@ type ReducedInstanceType_ReducedOffering struct {
 func (x *ReducedInstanceType_ReducedOffering) Reset() {
 	*x = ReducedInstanceType_ReducedOffering{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[12]
+		mi := &file_SchedulingInput_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -783,7 +681,7 @@ func (x *ReducedInstanceType_ReducedOffering) String() string {
 func (*ReducedInstanceType_ReducedOffering) ProtoMessage() {}
 
 func (x *ReducedInstanceType_ReducedOffering) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[12]
+	mi := &file_SchedulingInput_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -832,7 +730,7 @@ type SchedulingMetadataMap_MappingEntry struct {
 func (x *SchedulingMetadataMap_MappingEntry) Reset() {
 	*x = SchedulingMetadataMap_MappingEntry{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[13]
+		mi := &file_SchedulingInput_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -845,7 +743,7 @@ func (x *SchedulingMetadataMap_MappingEntry) String() string {
 func (*SchedulingMetadataMap_MappingEntry) ProtoMessage() {}
 
 func (x *SchedulingMetadataMap_MappingEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[13]
+	mi := &file_SchedulingInput_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -887,7 +785,7 @@ type Bindings_Binding struct {
 func (x *Bindings_Binding) Reset() {
 	*x = Bindings_Binding{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[14]
+		mi := &file_SchedulingInput_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -900,7 +798,7 @@ func (x *Bindings_Binding) String() string {
 func (*Bindings_Binding) ProtoMessage() {}
 
 func (x *Bindings_Binding) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[14]
+	mi := &file_SchedulingInput_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -943,7 +841,7 @@ type Bindings_Binding_NamespacedName struct {
 func (x *Bindings_Binding_NamespacedName) Reset() {
 	*x = Bindings_Binding_NamespacedName{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[15]
+		mi := &file_SchedulingInput_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -956,7 +854,7 @@ func (x *Bindings_Binding_NamespacedName) String() string {
 func (*Bindings_Binding_NamespacedName) ProtoMessage() {}
 
 func (x *Bindings_Binding_NamespacedName) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[15]
+	mi := &file_SchedulingInput_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -998,7 +896,7 @@ type NodePoolsToInstanceTypes_NodePoolToInstanceTypes struct {
 func (x *NodePoolsToInstanceTypes_NodePoolToInstanceTypes) Reset() {
 	*x = NodePoolsToInstanceTypes_NodePoolToInstanceTypes{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_SchedulingInput_proto_msgTypes[16]
+		mi := &file_SchedulingInput_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1011,7 +909,7 @@ func (x *NodePoolsToInstanceTypes_NodePoolToInstanceTypes) String() string {
 func (*NodePoolsToInstanceTypes_NodePoolToInstanceTypes) ProtoMessage() {}
 
 func (x *NodePoolsToInstanceTypes_NodePoolToInstanceTypes) ProtoReflect() protoreflect.Message {
-	mi := &file_SchedulingInput_proto_msgTypes[16]
+	mi := &file_SchedulingInput_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1095,25 +993,14 @@ var file_SchedulingInput_proto_rawDesc = []byte{
 	0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f,
 	0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x12,
 	0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0xb7, 0x02, 0x0a, 0x11, 0x53, 0x74,
+	0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x87, 0x01, 0x0a, 0x11, 0x53, 0x74,
 	0x61, 0x74, 0x65, 0x4e, 0x6f, 0x64, 0x65, 0x57, 0x69, 0x74, 0x68, 0x50, 0x6f, 0x64, 0x73, 0x12,
-	0x37, 0x0a, 0x04, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e,
-	0x53, 0x74, 0x61, 0x74, 0x65, 0x4e, 0x6f, 0x64, 0x65, 0x57, 0x69, 0x74, 0x68, 0x50, 0x6f, 0x64,
-	0x73, 0x2e, 0x52, 0x65, 0x64, 0x75, 0x63, 0x65, 0x64, 0x4e, 0x6f, 0x64, 0x65, 0x48, 0x00, 0x52,
-	0x04, 0x6e, 0x6f, 0x64, 0x65, 0x88, 0x01, 0x01, 0x12, 0x46, 0x0a, 0x09, 0x6e, 0x6f, 0x64, 0x65,
-	0x43, 0x6c, 0x61, 0x69, 0x6d, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x53, 0x74,
-	0x61, 0x74, 0x65, 0x4e, 0x6f, 0x64, 0x65, 0x57, 0x69, 0x74, 0x68, 0x50, 0x6f, 0x64, 0x73, 0x2e,
-	0x52, 0x65, 0x64, 0x75, 0x63, 0x65, 0x64, 0x4e, 0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x69, 0x6d,
-	0x48, 0x01, 0x52, 0x09, 0x6e, 0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x69, 0x6d, 0x88, 0x01, 0x01,
-	0x12, 0x1f, 0x0a, 0x04, 0x70, 0x6f, 0x64, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0b,
-	0x2e, 0x52, 0x65, 0x64, 0x75, 0x63, 0x65, 0x64, 0x50, 0x6f, 0x64, 0x52, 0x04, 0x70, 0x6f, 0x64,
-	0x73, 0x1a, 0x41, 0x0a, 0x0b, 0x52, 0x65, 0x64, 0x75, 0x63, 0x65, 0x64, 0x4e, 0x6f, 0x64, 0x65,
-	0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
-	0x6e, 0x61, 0x6d, 0x65, 0x12, 0x1e, 0x0a, 0x0a, 0x6e, 0x6f, 0x64, 0x65, 0x73, 0x74, 0x61, 0x74,
-	0x75, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x6e, 0x6f, 0x64, 0x65, 0x73, 0x74,
-	0x61, 0x74, 0x75, 0x73, 0x1a, 0x26, 0x0a, 0x10, 0x52, 0x65, 0x64, 0x75, 0x63, 0x65, 0x64, 0x4e,
-	0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x69, 0x6d, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x42, 0x07, 0x0a, 0x05,
+	0x17, 0x0a, 0x04, 0x6e, 0x6f, 0x64, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x48, 0x00, 0x52,
+	0x04, 0x6e, 0x6f, 0x64, 0x65, 0x88, 0x01, 0x01, 0x12, 0x21, 0x0a, 0x09, 0x6e, 0x6f, 0x64, 0x65,
+	0x43, 0x6c, 0x61, 0x69, 0x6d, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x48, 0x01, 0x52, 0x09, 0x6e,
+	0x6f, 0x64, 0x65, 0x43, 0x6c, 0x61, 0x69, 0x6d, 0x88, 0x01, 0x01, 0x12, 0x1f, 0x0a, 0x04, 0x70,
+	0x6f, 0x64, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0b, 0x2e, 0x52, 0x65, 0x64, 0x75,
+	0x63, 0x65, 0x64, 0x50, 0x6f, 0x64, 0x52, 0x04, 0x70, 0x6f, 0x64, 0x73, 0x42, 0x07, 0x0a, 0x05,
 	0x5f, 0x6e, 0x6f, 0x64, 0x65, 0x42, 0x0c, 0x0a, 0x0a, 0x5f, 0x6e, 0x6f, 0x64, 0x65, 0x43, 0x6c,
 	0x61, 0x69, 0x6d, 0x22, 0xc3, 0x03, 0x0a, 0x13, 0x52, 0x65, 0x64, 0x75, 0x63, 0x65, 0x64, 0x49,
 	0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e,
@@ -1202,7 +1089,7 @@ func file_SchedulingInput_proto_rawDescGZIP() []byte {
 	return file_SchedulingInput_proto_rawDescData
 }
 
-var file_SchedulingInput_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_SchedulingInput_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_SchedulingInput_proto_goTypes = []any{
 	(*BatchedDifferences)(nil),                               // 0: BatchedDifferences
 	(*SchedulingInput)(nil),                                  // 1: SchedulingInput
@@ -1213,14 +1100,12 @@ var file_SchedulingInput_proto_goTypes = []any{
 	(*Bindings)(nil),                                         // 6: Bindings
 	(*NodePoolsToInstanceTypes)(nil),                         // 7: NodePoolsToInstanceTypes
 	(*ReducedPod_PodCondition)(nil),                          // 8: ReducedPod.PodCondition
-	(*StateNodeWithPods_ReducedNode)(nil),                    // 9: StateNodeWithPods.ReducedNode
-	(*StateNodeWithPods_ReducedNodeClaim)(nil),               // 10: StateNodeWithPods.ReducedNodeClaim
-	(*ReducedInstanceType_ReducedRequirement)(nil),           // 11: ReducedInstanceType.ReducedRequirement
-	(*ReducedInstanceType_ReducedOffering)(nil),              // 12: ReducedInstanceType.ReducedOffering
-	(*SchedulingMetadataMap_MappingEntry)(nil),               // 13: SchedulingMetadataMap.MappingEntry
-	(*Bindings_Binding)(nil),                                 // 14: Bindings.Binding
-	(*Bindings_Binding_NamespacedName)(nil),                  // 15: Bindings.Binding.NamespacedName
-	(*NodePoolsToInstanceTypes_NodePoolToInstanceTypes)(nil), // 16: NodePoolsToInstanceTypes.NodePoolToInstanceTypes
+	(*ReducedInstanceType_ReducedRequirement)(nil),           // 9: ReducedInstanceType.ReducedRequirement
+	(*ReducedInstanceType_ReducedOffering)(nil),              // 10: ReducedInstanceType.ReducedOffering
+	(*SchedulingMetadataMap_MappingEntry)(nil),               // 11: SchedulingMetadataMap.MappingEntry
+	(*Bindings_Binding)(nil),                                 // 12: Bindings.Binding
+	(*Bindings_Binding_NamespacedName)(nil),                  // 13: Bindings.Binding.NamespacedName
+	(*NodePoolsToInstanceTypes_NodePoolToInstanceTypes)(nil), // 14: NodePoolsToInstanceTypes.NodePoolToInstanceTypes
 }
 var file_SchedulingInput_proto_depIdxs = []int32{
 	1,  // 0: BatchedDifferences.added:type_name -> SchedulingInput
@@ -1232,21 +1117,19 @@ var file_SchedulingInput_proto_depIdxs = []int32{
 	4,  // 6: SchedulingInput.instancetypes_data:type_name -> ReducedInstanceType
 	7,  // 7: SchedulingInput.nodepoolstoinstancetypes_data:type_name -> NodePoolsToInstanceTypes
 	8,  // 8: ReducedPod.conditions:type_name -> ReducedPod.PodCondition
-	9,  // 9: StateNodeWithPods.node:type_name -> StateNodeWithPods.ReducedNode
-	10, // 10: StateNodeWithPods.nodeClaim:type_name -> StateNodeWithPods.ReducedNodeClaim
-	2,  // 11: StateNodeWithPods.pods:type_name -> ReducedPod
-	11, // 12: ReducedInstanceType.requirements:type_name -> ReducedInstanceType.ReducedRequirement
-	12, // 13: ReducedInstanceType.offerings:type_name -> ReducedInstanceType.ReducedOffering
-	13, // 14: SchedulingMetadataMap.entries:type_name -> SchedulingMetadataMap.MappingEntry
-	14, // 15: Bindings.binding:type_name -> Bindings.Binding
-	16, // 16: NodePoolsToInstanceTypes.nodepoolstoinstancetypes:type_name -> NodePoolsToInstanceTypes.NodePoolToInstanceTypes
-	11, // 17: ReducedInstanceType.ReducedOffering.requirements:type_name -> ReducedInstanceType.ReducedRequirement
-	15, // 18: Bindings.Binding.pod_namespaced_name:type_name -> Bindings.Binding.NamespacedName
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	2,  // 9: StateNodeWithPods.pods:type_name -> ReducedPod
+	9,  // 10: ReducedInstanceType.requirements:type_name -> ReducedInstanceType.ReducedRequirement
+	10, // 11: ReducedInstanceType.offerings:type_name -> ReducedInstanceType.ReducedOffering
+	11, // 12: SchedulingMetadataMap.entries:type_name -> SchedulingMetadataMap.MappingEntry
+	12, // 13: Bindings.binding:type_name -> Bindings.Binding
+	14, // 14: NodePoolsToInstanceTypes.nodepoolstoinstancetypes:type_name -> NodePoolsToInstanceTypes.NodePoolToInstanceTypes
+	9,  // 15: ReducedInstanceType.ReducedOffering.requirements:type_name -> ReducedInstanceType.ReducedRequirement
+	13, // 16: Bindings.Binding.pod_namespaced_name:type_name -> Bindings.Binding.NamespacedName
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_SchedulingInput_proto_init() }
@@ -1364,30 +1247,6 @@ func file_SchedulingInput_proto_init() {
 			}
 		}
 		file_SchedulingInput_proto_msgTypes[9].Exporter = func(v any, i int) any {
-			switch v := v.(*StateNodeWithPods_ReducedNode); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_SchedulingInput_proto_msgTypes[10].Exporter = func(v any, i int) any {
-			switch v := v.(*StateNodeWithPods_ReducedNodeClaim); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_SchedulingInput_proto_msgTypes[11].Exporter = func(v any, i int) any {
 			switch v := v.(*ReducedInstanceType_ReducedRequirement); i {
 			case 0:
 				return &v.state
@@ -1399,7 +1258,7 @@ func file_SchedulingInput_proto_init() {
 				return nil
 			}
 		}
-		file_SchedulingInput_proto_msgTypes[12].Exporter = func(v any, i int) any {
+		file_SchedulingInput_proto_msgTypes[10].Exporter = func(v any, i int) any {
 			switch v := v.(*ReducedInstanceType_ReducedOffering); i {
 			case 0:
 				return &v.state
@@ -1411,7 +1270,7 @@ func file_SchedulingInput_proto_init() {
 				return nil
 			}
 		}
-		file_SchedulingInput_proto_msgTypes[13].Exporter = func(v any, i int) any {
+		file_SchedulingInput_proto_msgTypes[11].Exporter = func(v any, i int) any {
 			switch v := v.(*SchedulingMetadataMap_MappingEntry); i {
 			case 0:
 				return &v.state
@@ -1423,7 +1282,7 @@ func file_SchedulingInput_proto_init() {
 				return nil
 			}
 		}
-		file_SchedulingInput_proto_msgTypes[14].Exporter = func(v any, i int) any {
+		file_SchedulingInput_proto_msgTypes[12].Exporter = func(v any, i int) any {
 			switch v := v.(*Bindings_Binding); i {
 			case 0:
 				return &v.state
@@ -1435,7 +1294,7 @@ func file_SchedulingInput_proto_init() {
 				return nil
 			}
 		}
-		file_SchedulingInput_proto_msgTypes[15].Exporter = func(v any, i int) any {
+		file_SchedulingInput_proto_msgTypes[13].Exporter = func(v any, i int) any {
 			switch v := v.(*Bindings_Binding_NamespacedName); i {
 			case 0:
 				return &v.state
@@ -1447,7 +1306,7 @@ func file_SchedulingInput_proto_init() {
 				return nil
 			}
 		}
-		file_SchedulingInput_proto_msgTypes[16].Exporter = func(v any, i int) any {
+		file_SchedulingInput_proto_msgTypes[14].Exporter = func(v any, i int) any {
 			switch v := v.(*NodePoolsToInstanceTypes_NodePoolToInstanceTypes); i {
 			case 0:
 				return &v.state
@@ -1467,7 +1326,7 @@ func file_SchedulingInput_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_SchedulingInput_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -40,18 +40,9 @@ message ReducedPod {
 
 // A stateNode with the Pods it has on it.
 message StateNodeWithPods {
-  optional ReducedNode node = 1;
-  optional ReducedNodeClaim nodeClaim = 2;
+  optional bytes node = 1;
+  optional bytes nodeClaim = 2;
   repeated ReducedPod pods = 3;
-
-  message ReducedNode {
-    string name = 1;
-    bytes nodestatus = 2;
-  }
-
-  message ReducedNodeClaim {
-    string name = 1;
-  }
 }
 
 message ReducedInstanceType {

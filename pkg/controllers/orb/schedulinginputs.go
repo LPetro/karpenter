@@ -41,12 +41,12 @@ type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshal 
 
 // These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
 type SchedulingInput struct {
-	Timestamp             time.Time                     `json:"timestamp"`
-	PendingPods           []*v1.Pod                     `json:"pendingPods"`
-	StateNodesWithPods    []*StateNodeWithPods          `json:"stateNodesWithPods"`
-	Bindings              BindingsMap                   `json:"bindings"`
-	AllInstanceTypes      []*cloudprovider.InstanceType `json:"allInstanceTypes"`
-	NodePoolInstanceTypes map[string][]string           `json:"nodePoolInstanceTypes"`
+	Timestamp             time.Time
+	PendingPods           []*v1.Pod
+	StateNodesWithPods    []*StateNodeWithPods
+	Bindings              BindingsMap
+	AllInstanceTypes      []*cloudprovider.InstanceType
+	NodePoolInstanceTypes map[string][]string
 }
 
 // A stateNode with the Pods it has on it.
@@ -82,6 +82,7 @@ func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod,
 	}
 }
 
+// Mirrors StateNode's GetName
 func (snp StateNodeWithPods) GetName() string {
 	if snp.Node == nil {
 		return snp.NodeClaim.GetName()
@@ -98,6 +99,7 @@ func (si SchedulingInput) String() string {
 	return protoSchedulingInput(&si).String()
 }
 
+// TODO: I don't think this is marshalling Requirements appropriately. It has Key, but no values. String() gathers that information, so it definitely exists.
 func (si SchedulingInput) Json() string {
 	return pretty.Concise(si)
 }
@@ -194,21 +196,23 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	for _, node := range nodes {
 		if node != nil {
 			reducedStateNode := &state.StateNode{}
-			if node.Node != nil {
-				reducedStateNode.Node = &v1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: node.Node.Name,
-					},
-					Status: node.Node.Status,
-				}
-			}
-			if node.NodeClaim != nil {
-				reducedStateNode.NodeClaim = &v1beta1.NodeClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: node.NodeClaim.Name,
-					},
-				}
-			}
+			reducedStateNode.Node = node.Node
+			// if node.Node != nil {
+			// 	reducedStateNode.Node = &v1.Node{
+			// 		ObjectMeta: metav1.ObjectMeta{
+			// 			Name: node.Node.Name,
+			// 		},
+			// 		Status: node.Node.Status,
+			// 	}
+			// }
+			reducedStateNode.NodeClaim = node.NodeClaim
+			// if node.NodeClaim != nil {
+			// 	reducedStateNode.NodeClaim = &v1beta1.NodeClaim{
+			// 		ObjectMeta: metav1.ObjectMeta{
+			// 			Name: node.NodeClaim.Name,
+			// 		},
+			// 	}
+			// }
 			if reducedStateNode.Node != nil || reducedStateNode.NodeClaim != nil {
 				reducedStateNodes = append(reducedStateNodes, reducedStateNode)
 			}
@@ -369,15 +373,18 @@ func reconstructPodConditions(reducedPodConditions []*pb.ReducedPod_PodCondition
 func protoStateNodesWithPods(stateNodesWithPods []*StateNodeWithPods) []*pb.StateNodeWithPods {
 	snpData := []*pb.StateNodeWithPods{}
 	for _, snp := range stateNodesWithPods {
-		var nodeClaim *pb.StateNodeWithPods_ReducedNodeClaim
-		if snp.NodeClaim != nil {
-			nodeClaim = &pb.StateNodeWithPods_ReducedNodeClaim{
-				Name: snp.NodeClaim.GetName(),
-			}
+		nodeData, err := snp.Node.Marshal()
+		if err != nil {
+			continue // There is no Node, maybe there's a nodeclaim
 		}
+		nodeClaimData, err := json.Marshal(snp.NodeClaim)
+		if err != nil {
+			continue // There is no NodeClaim
+		}
+
 		snpData = append(snpData, &pb.StateNodeWithPods{
-			Node:      protoNode(snp.Node),
-			NodeClaim: nodeClaim,
+			Node:      nodeData,
+			NodeClaim: nodeClaimData,
 			Pods:      protoPods(snp.Pods),
 		})
 	}
@@ -387,49 +394,18 @@ func protoStateNodesWithPods(stateNodesWithPods []*StateNodeWithPods) []*pb.Stat
 func reconstructStateNodesWithPods(snpData []*pb.StateNodeWithPods) []*StateNodeWithPods {
 	stateNodesWithPods := []*StateNodeWithPods{}
 	for _, snpData := range snpData {
-		var nodeClaim *v1beta1.NodeClaim
-		if snpData.NodeClaim != nil {
-			nodeClaim = &v1beta1.NodeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: snpData.NodeClaim.Name,
-				},
-			}
-		}
+		node := &v1.Node{}
+		node.Unmarshal(snpData.Node)
+		nodeClaim := &v1beta1.NodeClaim{}
+		json.Unmarshal(snpData.NodeClaim, nodeClaim)
+
 		stateNodesWithPods = append(stateNodesWithPods, &StateNodeWithPods{
-			Node:      reconstructNode(snpData.Node),
+			Node:      node,
 			NodeClaim: nodeClaim,
 			Pods:      reconstructPods(snpData.Pods),
 		})
 	}
 	return stateNodesWithPods
-}
-
-func protoNode(node *v1.Node) *pb.StateNodeWithPods_ReducedNode {
-	if node == nil {
-		return nil
-	}
-	nodeStatus, err := node.Status.Marshal()
-	if err != nil {
-		return nil
-	}
-
-	return &pb.StateNodeWithPods_ReducedNode{
-		Name:       node.Name,
-		Nodestatus: nodeStatus,
-	}
-}
-
-func reconstructNode(nodeData *pb.StateNodeWithPods_ReducedNode) *v1.Node {
-	if nodeData == nil {
-		return nil
-	}
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nodeData.Name,
-		},
-	}
-	node.Status.Unmarshal(nodeData.Nodestatus)
-	return node
 }
 
 func protoInstanceTypes(instanceTypes []*cloudprovider.InstanceType) []*pb.ReducedInstanceType {

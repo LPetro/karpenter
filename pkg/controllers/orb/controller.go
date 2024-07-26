@@ -19,7 +19,6 @@ package orb
 import (
 	"container/heap"
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -129,8 +128,8 @@ func (c *Controller) logSchedulingInputsToPV() error {
 }
 
 func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
-	// logdata, err := MarshalSchedulingInput(item)
-	logdata, err := json.Marshal(item)
+	logdata, err := MarshalSchedulingInput(item)
+	// logdata, err := json.Marshal(item)
 	if err != nil {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err

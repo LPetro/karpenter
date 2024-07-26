@@ -53,36 +53,36 @@ func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlF
 
 	fmt.Println("Nodepools are", nodePools)
 
-	// // Reconstruct the dynamic fields from my logged inputs
-	// // TODO: Currently this is via the saved .log files, not directly from a provided PV
-	// stateNodes := getStateNodesFromSchedulingInput(reconstructedSchedulingInput)
-	// instanceTypes := getInstanceTypesFromSchedulingInput(reconstructedSchedulingInput)
-	// pods := reconstructedSchedulingInput.PendingPods
+	// Reconstruct the dynamic fields from my logged inputs
+	// TODO: Currently this is via the saved .log files, not directly from a provided PV
+	stateNodes := getStateNodesFromSchedulingInput(reconstructedSchedulingInput)
+	instanceTypes := getInstanceTypesFromSchedulingInput(reconstructedSchedulingInput)
+	pods := reconstructedSchedulingInput.PendingPods
 
-	// // How do I put bindings back into cluster? I just made this
-	// // TODO: Check if this even works the way I want it to.
-	// cluster.SetBindings(reconstructedSchedulingInput.Bindings)
+	// How do I put bindings back into cluster? I just made this
+	// TODO: Check if this even works the way I want it to.
+	cluster.SetBindings(reconstructedSchedulingInput.Bindings)
 
-	// topology, pods, err := getTopologyFromSchedulingInput(ctx, kubeClient, cluster, nodePools, instanceTypes, pods)
-	// if err != nil {
-	// 	fmt.Println("Error getting topology from scheduling input:", err)
-	// 	return scheduler.Results{}, err
-	// }
+	topology, pods, err := getTopologyFromSchedulingInput(ctx, kubeClient, cluster, nodePools, instanceTypes, pods)
+	if err != nil {
+		fmt.Println("Error getting topology from scheduling input:", err)
+		return scheduler.Results{}, err
+	}
 
-	// // DaemonSetPods? How can I pull this once?
-	// daemonSetPods := []*v1.Pod{}
+	// DaemonSetPods? How can I pull this once?
+	daemonSetPods := []*v1.Pod{}
 
-	// // topology
+	// topology
 
-	// // TODO: Figure out why this makes Karpenter call the command-line arguments I've passed in; try to clear them or get around this
-	// s := scheduler.NewScheduler(kubeClient, nodePools, cluster, stateNodes, topology, instanceTypes, daemonSetPods, nil)
-	// return s.Solve(ctx, pods), nil
-	// fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
+	// TODO: Figure out why this makes Karpenter call the command-line arguments I've passed in; try to clear them or get around this
+	s := scheduler.NewScheduler(kubeClient, nodePools, cluster, stateNodes, topology, instanceTypes, daemonSetPods, nil)
+	return s.Solve(ctx, pods), nil
+	fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
 	return scheduler.Results{}, nil
 }
 
 // TODO: Functionality not yet tested
-func unmarshalNodePoolFromUser(nodepoolYamlFilepath string) ([]*v1beta1.NodePool, error) {
+func unmarshalNodePoolFromUser(nodepoolYamlFilepath string) (*v1beta1.NodePool, error) {
 	yamlFile, err := os.Open(nodepoolYamlFilepath)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
