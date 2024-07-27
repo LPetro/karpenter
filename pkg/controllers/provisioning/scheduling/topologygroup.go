@@ -274,59 +274,57 @@ func (t *TopologyGroup) selects(pod *v1.Pod) bool {
 	return t.namespaces.Has(pod.Namespace) && selector.Matches(labels.Set(pod.Labels))
 }
 
-// This function marshal a TopologyGroup as a JSON
 func (t *TopologyGroup) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Key          string
 		Type         TopologyType
-		maxSkew      int32
-		minDomains   *int32
-		namespaces   sets.Set[string]
-		selector     *metav1.LabelSelector
-		nodeFilter   TopologyNodeFilter
-		owners       map[types.UID]struct{}
-		domains      map[string]int32
-		emptyDomains sets.Set[string]
+		MaxSkew      int32
+		MinDomains   *int32
+		Namespaces   sets.Set[string]
+		Selector     *metav1.LabelSelector
+		NodeFilter   TopologyNodeFilter
+		Owners       map[types.UID]struct{}
+		Domains      map[string]int32
+		EmptyDomains sets.Set[string]
 	}{
 		Key:          t.Key,
 		Type:         t.Type,
-		maxSkew:      t.maxSkew,
-		minDomains:   t.minDomains,
-		namespaces:   t.namespaces,
-		selector:     t.selector,
-		nodeFilter:   t.nodeFilter,
-		owners:       t.owners,
-		domains:      t.domains,
-		emptyDomains: t.emptyDomains,
+		MaxSkew:      t.maxSkew,
+		MinDomains:   t.minDomains,
+		Namespaces:   t.namespaces,
+		Selector:     t.selector,
+		NodeFilter:   t.nodeFilter,
+		Owners:       t.owners,
+		Domains:      t.domains,
+		EmptyDomains: t.emptyDomains,
 	})
 }
 
-// This function unmarshals correspondingly
 func (t *TopologyGroup) UnmarshalJSON(data []byte) error {
 	var tmp struct {
 		Key          string
 		Type         TopologyType
-		maxSkew      int32
-		minDomains   *int32
-		namespaces   sets.Set[string]
-		selector     *metav1.LabelSelector
-		nodeFilter   TopologyNodeFilter
-		owners       map[types.UID]struct{}
-		domains      map[string]int32
-		emptyDomains sets.Set[string]
+		MaxSkew      int32
+		MinDomains   *int32
+		Namespaces   sets.Set[string]
+		Selector     *metav1.LabelSelector
+		NodeFilter   TopologyNodeFilter
+		Owners       map[types.UID]struct{}
+		Domains      map[string]int32
+		EmptyDomains sets.Set[string]
 	}
 	if err := json.Unmarshal(data, &tmp); err != nil {
 		return err
 	}
 	t.Key = tmp.Key
 	t.Type = tmp.Type
-	t.maxSkew = tmp.maxSkew
-	t.minDomains = tmp.minDomains
-	t.namespaces = tmp.namespaces
-	t.selector = tmp.selector
-	t.nodeFilter = tmp.nodeFilter
-	t.owners = tmp.owners
-	t.domains = tmp.domains
-	t.emptyDomains = tmp.emptyDomains
+	t.maxSkew = tmp.MaxSkew
+	t.minDomains = tmp.MinDomains
+	t.namespaces = tmp.Namespaces
+	t.selector = tmp.Selector
+	t.nodeFilter = tmp.NodeFilter
+	t.owners = tmp.Owners
+	t.domains = tmp.Domains
+	t.emptyDomains = tmp.EmptyDomains
 	return nil
 }

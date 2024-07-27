@@ -442,10 +442,10 @@ func IgnoredForTopology(p *v1.Pod) bool {
 // Function to marshal Topology as a JSON for the four internal fields
 func (t *Topology) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Topologies        map[uint64]*TopologyGroup   `json:"topologies"`
-		InverseTopologies map[uint64]*TopologyGroup   `json:"inverseTopologies"`
-		Domains           map[string]sets.Set[string] `json:"domains"`
-		ExcludedPods      sets.Set[string]            `json:"excludedPods"`
+		Topologies        map[uint64]*TopologyGroup
+		InverseTopologies map[uint64]*TopologyGroup
+		Domains           map[string]sets.Set[string]
+		ExcludedPods      sets.Set[string]
 	}{
 		Topologies:        t.topologies,
 		InverseTopologies: t.inverseTopologies,
