@@ -572,10 +572,13 @@ func reconstructNodePoolInstanceTypes(npitProto *pb.NodePoolsToInstanceTypes) ma
 }
 
 func protoTopology(topology *scheduler.Topology) []byte {
+	if topology == nil {
+		return []byte{}
+	}
 	topologyData, err := json.Marshal(topology)
 	if err != nil {
 		fmt.Println("Error marshaling topology to JSON", err)
-		return nil
+		return []byte{}
 	}
 	return topologyData
 }
@@ -597,7 +600,7 @@ func protoDaemonSetPods(daemonSetPods []*v1.Pod) []byte {
 	dspData, err := podList.Marshal()
 	if err != nil {
 		fmt.Println("Error marshaling DaemonSetPods to JSON", err)
-		return nil
+		return []byte{}
 	}
 	return dspData
 }
@@ -615,10 +618,13 @@ func reconstructDaemonSetPods(dspData []byte) []*v1.Pod {
 }
 
 func protoPVList(pvList *v1.PersistentVolumeList) []byte {
+	if pvList == nil {
+		return []byte{}
+	}
 	pvListData, err := pvList.Marshal()
 	if err != nil {
 		fmt.Println("Error marshaling PVList to JSON", err)
-		return nil
+		return []byte{}
 	}
 	return pvListData
 }
@@ -630,10 +636,13 @@ func reconstructPVList(pvListData []byte) *v1.PersistentVolumeList {
 }
 
 func protoPVCList(pvcList *v1.PersistentVolumeClaimList) []byte {
+	if pvcList == nil {
+		return []byte{}
+	}
 	pvcListData, err := pvcList.Marshal()
 	if err != nil {
 		fmt.Println("Error marshaling PVCList to JSON", err)
-		return nil
+		return []byte{}
 	}
 	return pvcListData
 }
