@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"bufio"
 	"container/heap"
 	"flag"
 	"fmt"
@@ -26,13 +25,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 
 	_ "knative.dev/pkg/system/testing"
+	"sigs.k8s.io/karpenter/hack/orb/pkg"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 )
@@ -82,12 +81,12 @@ func main() {
 	/* ----------------------- */
 	/* (Below) Stretch Goal:   Have the tool resimulate and compare to the original results */
 
-	// results, err := pkg.Resimulate(reconstructedSchedulingInput, nodepoolsYamlFilepath)
-	// if err != nil {
-	// 	fmt.Println("Error resimulating:", err)
-	// 	return
-	// }
-	// fmt.Println("Results are:", results)
+	results, err := pkg.Resimulate(reconstructedSchedulingInput, nodepoolsYamlFilepath)
+	if err != nil {
+		fmt.Println("Error resimulating:", err)
+		return
+	}
+	fmt.Println("Results are:", results)
 
 	// TODO: Compare these results with the original results' set of nodeclaims / nodeclaim returned from EC2Fleet...
 }
@@ -141,20 +140,21 @@ func readMetadataLogs() ([]*SchedulingMetadataOption, error) {
 }
 
 func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadataOption {
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Available options:")
 	for _, option := range options {
 		fmt.Println(option.String())
 	}
 
 	fmt.Print("Enter the option number: ")
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 0 || choice >= len(options) {
-		fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
-		return promptUserForOption(options)
-	}
+	// input, _ := reader.ReadString('\n')
+	// input = strings.TrimSpace(input)
+	// choice, err := strconv.Atoi(input)
+	choice := 0
+	// if err != nil || choice < 0 || choice >= len(options) {
+	// 	fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
+	// 	return promptUserForOption(options)
+	// }
 	return options[choice]
 }
 

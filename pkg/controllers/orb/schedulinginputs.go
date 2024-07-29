@@ -53,6 +53,7 @@ type SchedulingInput struct {
 	DaemonSetPods         []*v1.Pod
 	PVList                *v1.PersistentVolumeList
 	PVCList               *v1.PersistentVolumeClaimList
+	ScheduledPodList      *v1.PodList
 }
 
 // A stateNode with the Pods it has on it.
@@ -97,6 +98,14 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		fmt.Println("PV List error in Scheduling Input logging: ", err)
 		return SchedulingInput{}
 	}
+	scheduledPodList := &v1.PodList{}
+	// Get all pods from kubeClient
+	err = kubeClient.List(ctx, scheduledPodList)
+	if err != nil {
+		fmt.Println("Pod List error in Scheduling Input logging: ", err)
+		return SchedulingInput{}
+	}
+
 	return SchedulingInput{
 		Timestamp:             scheduledTime,
 		PendingPods:           pendingPods,
@@ -108,12 +117,13 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		DaemonSetPods:         daemonSetPods,
 		PVList:                pvList,
 		PVCList:               pvcList,
+		ScheduledPodList:      scheduledPodList,
 	}
 }
 
 func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods, bindings map[types.NamespacedName]string,
 	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology, daemonSetPods []*v1.Pod,
-	pvList *v1.PersistentVolumeList, pvcList *v1.PersistentVolumeClaimList) *SchedulingInput {
+	pvList *v1.PersistentVolumeList, pvcList *v1.PersistentVolumeClaimList, scheduledPodList *v1.PodList) *SchedulingInput {
 	return &SchedulingInput{
 		Timestamp:             timestamp,
 		PendingPods:           pendingPods,
@@ -125,6 +135,7 @@ func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod,
 		DaemonSetPods:         daemonSetPods,
 		PVList:                pvList,
 		PVCList:               pvcList,
+		ScheduledPodList:      scheduledPodList,
 	}
 }
 
@@ -324,6 +335,7 @@ func protoSchedulingInput(si *SchedulingInput) *pb.SchedulingInput {
 		DaemonsetpodsData:            protoDaemonSetPods(si.DaemonSetPods),
 		PvlistData:                   protoPVList(si.PVList),
 		PvclistData:                  protoPVCList(si.PVCList),
+		ScheduledpodlistData:         protoScheduledPodList(si.ScheduledPodList),
 	}
 }
 
@@ -344,6 +356,7 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		reconstructDaemonSetPods(pbsi.GetDaemonsetpodsData()),
 		reconstructPVList(pbsi.GetPvlistData()),
 		reconstructPVCList(pbsi.GetPvclistData()),
+		reconstructScheduledPodList(pbsi.GetScheduledpodlistData()),
 	), nil
 }
 
@@ -651,4 +664,22 @@ func reconstructPVCList(pvcListData []byte) *v1.PersistentVolumeClaimList {
 	pvcList := &v1.PersistentVolumeClaimList{}
 	pvcList.Unmarshal(pvcListData)
 	return pvcList
+}
+
+func protoScheduledPodList(scheduledPodList *v1.PodList) []byte {
+	if scheduledPodList == nil {
+		return []byte{}
+	}
+	scheduledPodListData, err := scheduledPodList.Marshal()
+	if err != nil {
+		fmt.Println("Error marshaling ScheduledPodList to JSON", err)
+		return []byte{}
+	}
+	return scheduledPodListData
+}
+
+func reconstructScheduledPodList(scheduledPodListData []byte) *v1.PodList {
+	scheduledPodList := &v1.PodList{}
+	scheduledPodList.Unmarshal(scheduledPodListData)
+	return scheduledPodList
 }

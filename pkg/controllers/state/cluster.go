@@ -598,8 +598,25 @@ func (c *Cluster) GetBindings() map[types.NamespacedName]string {
 	return bindings
 }
 
-func (c *Cluster) SetBindings(bindings map[types.NamespacedName]string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// For ORB Logs, reconstructs bindings, nodes, daemonsetpods and maps from nodename to providerID and nodeclaim name to providerID
+func (c *Cluster) ReconstructCluster(ctx context.Context, bindings map[types.NamespacedName]string, stateNodes []*StateNode, daemonSetPods []*v1.Pod, pendingPods []*v1.Pod) {
+	// Set Bindings
 	c.bindings = bindings
+
+	// // Set Nodes and mappings to providerID
+	// for _, statenode := range stateNodes {
+	// 	c.nodeNameToProviderID[statenode.Node.Name] = statenode.Node.Spec.ProviderID
+	// 	c.nodeClaimNameToProviderID[statenode.NodeClaim.Name] = statenode.NodeClaim.Status.ProviderID
+	// 	c.nodes[statenode.NodeClaim.Status.ProviderID] = statenode
+	// }
+
+	for _, statenode := range stateNodes {
+		c.UpdateNode(ctx, statenode.Node)
+		c.UpdateNodeClaim(statenode.NodeClaim)
+	}
+
+	// Set DaemonSetPods
+	for _, pod := range daemonSetPods {
+		c.daemonSetPods.Store(client.ObjectKeyFromObject(pod), pod)
+	}
 }

@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/utils/clock"
 	_ "knative.dev/pkg/system/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -45,13 +46,13 @@ func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlF
 	// kubeClient := op.GetClient() // ??
 	// cluster := state.NewCluster(clock, kubeClient)
 
-	nodePools, err := unmarshalNodePoolFromUser(nodepoolYamlFilepath)
+	nodePool, err := unmarshalNodePoolFromUser(nodepoolYamlFilepath)
 	if err != nil {
 		fmt.Println("Error unmarshalling node pools:", err)
 		return scheduler.Results{}, err
 	}
 
-	fmt.Println("Nodepools are", nodePools)
+	nodePools := []*v1beta1.NodePool{nodePool}
 
 	// Reconstruct the dynamic fields from my logged inputs
 	// TODO: Currently this is via the saved .log files, not directly from a provided PV
@@ -60,18 +61,21 @@ func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlF
 	pods := reconstructedSchedulingInput.PendingPods
 	topology := reconstructedSchedulingInput.Topology
 	daemonSetPods := reconstructedSchedulingInput.DaemonSetPods
+	pvList := reconstructedSchedulingInput.PVList
+	pvcList := reconstructedSchedulingInput.PVCList
 
-	// DataClient := New
+	dataClient := New(pvList, pvcList)
+	cluster := state.NewCluster(clock.RealClock{}, dataClient)
 
 	// How do I put bindings back into cluster? I just made this
 	// TODO: Check if this even works the way I want it to.
-	cluster.SetBindings(reconstructedSchedulingInput.Bindings)
+	cluster.ReconstructCluster(ctx, reconstructedSchedulingInput.Bindings, stateNodes, daemonSetPods)
 
 	// TODO: Figure out why this makes Karpenter call the command-line arguments I've passed in; try to clear them or get around this
-	s := scheduler.NewScheduler(kubeClient, nodePools, cluster, stateNodes, topology, instanceTypes, daemonSetPods, nil)
+	s := scheduler.NewScheduler(dataClient, nodePools, cluster, stateNodes, topology, instanceTypes, daemonSetPods, nil)
 	return s.Solve(ctx, pods), nil
-	fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
-	return scheduler.Results{}, nil
+	// fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
+	// return scheduler.Results{}, nil
 }
 
 // TODO: Functionality not yet tested, needs to return []*NodePool

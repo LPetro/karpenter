@@ -25,6 +25,7 @@ message SchedulingInput {
   optional bytes daemonsetpods_data = 8;
   optional bytes pvlist_data = 9;
   optional bytes pvclist_data = 10;
+  optional bytes scheduledpodlist_data = 11;
 }
 
 message ReducedPod {

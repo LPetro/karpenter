@@ -32,21 +32,21 @@ import (
 type ObjectKey = types.NamespacedName
 
 type DataClient struct {
-	persistentvolumeclaim []*v1.PersistentVolumeClaim
-	persistentvolume      []*v1.PersistentVolume
+	persistentvolumeclaimlist *v1.PersistentVolumeClaimList
+	persistentvolumelist      *v1.PersistentVolumeList
 }
 
-func New(pvc []*v1.PersistentVolumeClaim, pv []*v1.PersistentVolume) *DataClient {
+func New(pvlist *v1.PersistentVolumeList, pvclist *v1.PersistentVolumeClaimList) *DataClient {
 	d := &DataClient{}
-	d.persistentvolumeclaim = pvc
-	d.persistentvolume = pv
+	d.persistentvolumeclaimlist = pvclist
+	d.persistentvolumelist = pvlist
 	return d
 }
 
 // Currently the schudluer only needs to be able to read for the persistent volume and the persistent volume claim
 func (d DataClient) Get(_ context.Context, key ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	if obj.GetObjectKind().GroupVersionKind().Kind == "PersistentVolumeClaim" {
-		objPVC, found := lo.Find(d.persistentvolumeclaim, func(pvc *v1.PersistentVolumeClaim) bool {
+		objPVC, found := lo.Find(d.persistentvolumeclaimlist.Items, func(pvc v1.PersistentVolumeClaim) bool {
 			return pvc.Name == key.Name && pvc.Namespace == key.Namespace
 		})
 		if found {
@@ -57,7 +57,7 @@ func (d DataClient) Get(_ context.Context, key ObjectKey, obj client.Object, opt
 	}
 
 	if obj.GetObjectKind().GroupVersionKind().Kind == "PersistentVolume" {
-		objPV, found := lo.Find(d.persistentvolume, func(pv *v1.PersistentVolume) bool {
+		objPV, found := lo.Find(d.persistentvolumelist.Items, func(pv v1.PersistentVolume) bool {
 			return pv.Name == key.Name && pv.Namespace == key.Namespace
 		})
 		if found {

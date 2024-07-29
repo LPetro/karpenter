@@ -52,6 +52,7 @@ type NodePoolsToInstanceTypesDifferences Differences[map[string][]string]
 type TopologyDifferences Differences[*scheduler.Topology]
 type PVListDifferences Differences[*v1.PersistentVolumeList]
 type PVCListDifferences Differences[*v1.PersistentVolumeClaimList]
+type ScheduledPodDifferences Differences[*v1.PodList]
 
 func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
 	protoAdded, protoRemoved, protoChanged := crossSection(batchedDifferences)
@@ -232,6 +233,7 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 		DaemonSetPods:         baseline.DaemonSetPods,
 		PVList:                baseline.PVList,
 		PVCList:               baseline.PVCList,
+		ScheduledPodList:      baseline.ScheduledPodList,
 	}
 
 	// Iterate over the baseline, making each time's set of changes
@@ -264,6 +266,7 @@ func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *Schedul
 	iteratingInput.DaemonSetPods = mergeDaemonSetPods(iteratingInput.DaemonSetPods, differences)
 	iteratingInput.PVList = mergePVList(iteratingInput.PVList, differences)
 	iteratingInput.PVCList = mergePVCList(iteratingInput.PVCList, differences)
+	iteratingInput.ScheduledPodList = mergeScheduledPodList(iteratingInput.ScheduledPodList, differences)
 }
 
 // TODO: Generalize the functions below to some interface mapping or "lo"-based helper.
@@ -448,6 +451,17 @@ func mergePVCList(iteratingPVCList *v1.PersistentVolumeClaimList, differences *S
 	return iteratingPVCList
 }
 
+func mergeScheduledPodList(iteratingScheduledPodList *v1.PodList, differences *SchedulingInputDifferences) *v1.PodList {
+	if differences.Changed != nil && !differences.Changed.isEmpty() {
+		if differences.Changed.ScheduledPodList != nil {
+			return differences.Changed.ScheduledPodList
+		}
+	}
+	return iteratingScheduledPodList
+}
+
+// Helper function to map the baseline pods by UID
+
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
 func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferences {
 	// Determine the differences in each of the fields of ScheduleInput
@@ -460,6 +474,7 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferen
 	dspDiff := diffDaemonSetPods(oldSi.DaemonSetPods, si.DaemonSetPods)
 	pvListDiff := diffPVList(oldSi.PVList, si.PVList)
 	pvcListDiff := diffPVCList(oldSi.PVCList, si.PVCList)
+	scheduledPodListDiff := diffScheduledPods(oldSi.ScheduledPodList, si.ScheduledPodList)
 
 	diffAdded := &SchedulingInput{}
 	diffRemoved := &SchedulingInput{}
@@ -467,15 +482,15 @@ func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferen
 
 	// If there are added differences, include them
 	if len(podDiff.Added) > 0 || len(snpDiff.Added) > 0 || len(bindingsDiff.Added) > 0 || len(itDiff.Added) > 0 || len(npitDiff.Added) > 0 || len(dspDiff.Added) > 0 {
-		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added, nil, dspDiff.Added, nil, nil)
+		diffAdded = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added, nil, dspDiff.Added, nil, nil, nil)
 		// fmt.Println("Diff Scheduling Input added is... ", diffAdded.String()) // Test print, delete later
 	}
 	if len(podDiff.Removed) > 0 || len(snpDiff.Removed) > 0 || len(bindingsDiff.Removed) > 0 || len(itDiff.Removed) > 0 || len(npitDiff.Removed) > 0 || len(dspDiff.Removed) > 0 {
-		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed, nil, dspDiff.Removed, nil, nil)
+		diffRemoved = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed, nil, dspDiff.Removed, nil, nil, nil)
 		// fmt.Println("Diff Scheduling Input removed is... ", diffRemoved.String()) // Test print, delete later
 	}
-	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 || len(npitDiff.Changed) > 0 || (topologyDiff.Changed != nil) || len(dspDiff.Changed) > 0 || pvListDiff.Changed != nil || pvcListDiff.Changed != nil {
-		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed, topologyDiff.Changed, dspDiff.Changed, pvListDiff.Changed, pvcListDiff.Changed)
+	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 || len(npitDiff.Changed) > 0 || (topologyDiff.Changed != nil) || len(dspDiff.Changed) > 0 || pvListDiff.Changed != nil || pvcListDiff.Changed != nil || scheduledPodListDiff.Changed != nil {
+		diffChanged = NewReconstructedSchedulingInput(si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed, topologyDiff.Changed, dspDiff.Changed, pvListDiff.Changed, pvcListDiff.Changed, scheduledPodListDiff.Changed)
 		// fmt.Println("Diff Scheduling Input changed is... ", diffChanged.String()) // Test print, delete later
 	}
 
@@ -729,6 +744,21 @@ func diffPVCList(oldpvcList, newpvcList *v1.PersistentVolumeClaimList) PVCListDi
 	}
 	return diff
 }
+
+func diffScheduledPods(oldScheduledPods, newScheduledPods *v1.PodList) ScheduledPodDifferences {
+	diff := ScheduledPodDifferences{
+		Added:   nil,
+		Removed: nil,
+		Changed: nil,
+	}
+
+	if !structEqualJSON(oldScheduledPods, newScheduledPods) {
+		diff.Changed = newScheduledPods
+	}
+	return diff
+}
+
+// Helper functions
 
 func hasReducedPodChanged(oldPod, newPod *v1.Pod) bool {
 	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta, newPod.ObjectMeta) ||
