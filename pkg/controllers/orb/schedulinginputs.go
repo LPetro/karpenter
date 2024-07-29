@@ -39,7 +39,7 @@ import (
 )
 
 type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshal definition
-type Topology *scheduler.Topology                // Alias for JSON Marshaling
+// type Topology *scheduler.Topology                // Alias for JSON Marshaling
 
 // These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
 type SchedulingInput struct {
@@ -51,6 +51,8 @@ type SchedulingInput struct {
 	NodePoolInstanceTypes map[string][]string
 	Topology              *scheduler.Topology
 	DaemonSetPods         []*v1.Pod
+	PVList                *v1.PersistentVolumeList
+	PVCList               *v1.PersistentVolumeClaimList
 }
 
 // A stateNode with the Pods it has on it.
@@ -82,6 +84,19 @@ type StateNodeWithPods struct {
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod, stateNodes []*state.StateNode,
 	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) SchedulingInput {
 	allInstanceTypes, nodePoolInstanceTypes := getAllInstanceTypesAndNodePoolMapping(instanceTypes)
+	// Get all PVs and PVCs from kubeClient
+	pvcList := &v1.PersistentVolumeClaimList{}
+	err := kubeClient.List(ctx, pvcList)
+	if err != nil {
+		fmt.Println("PVC List error in Scheduling Input logging: ", err)
+		return SchedulingInput{}
+	}
+	pvList := &v1.PersistentVolumeList{}
+	err = kubeClient.List(ctx, pvList)
+	if err != nil {
+		fmt.Println("PV List error in Scheduling Input logging: ", err)
+		return SchedulingInput{}
+	}
 	return SchedulingInput{
 		Timestamp:             scheduledTime,
 		PendingPods:           pendingPods,
@@ -91,11 +106,14 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		NodePoolInstanceTypes: nodePoolInstanceTypes,
 		Topology:              topology,
 		DaemonSetPods:         daemonSetPods,
+		PVList:                pvList,
+		PVCList:               pvcList,
 	}
 }
 
 func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods, bindings map[types.NamespacedName]string,
-	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology, daemonSetPods []*v1.Pod) *SchedulingInput {
+	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology, daemonSetPods []*v1.Pod,
+	pvList *v1.PersistentVolumeList, pvcList *v1.PersistentVolumeClaimList) *SchedulingInput {
 	return &SchedulingInput{
 		Timestamp:             timestamp,
 		PendingPods:           pendingPods,
@@ -105,6 +123,8 @@ func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod,
 		NodePoolInstanceTypes: nodePoolInstanceTypes,
 		Topology:              topology,
 		DaemonSetPods:         daemonSetPods,
+		PVList:                pvList,
+		PVCList:               pvcList,
 	}
 }
 
@@ -302,6 +322,8 @@ func protoSchedulingInput(si *SchedulingInput) *pb.SchedulingInput {
 		NodepoolstoinstancetypesData: protoNodePoolInstanceTypes(si.NodePoolInstanceTypes),
 		TopologyData:                 protoTopology(si.Topology),
 		DaemonsetpodsData:            protoDaemonSetPods(si.DaemonSetPods),
+		PvlistData:                   protoPVList(si.PVList),
+		PvclistData:                  protoPVCList(si.PVCList),
 	}
 }
 
@@ -320,6 +342,8 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		reconstructNodePoolInstanceTypes(pbsi.GetNodepoolstoinstancetypesData()),
 		reconstructTopology(pbsi.GetTopologyData()),
 		reconstructDaemonSetPods(pbsi.GetDaemonsetpodsData()),
+		reconstructPVList(pbsi.GetPvlistData()),
+		reconstructPVCList(pbsi.GetPvclistData()),
 	), nil
 }
 
@@ -588,4 +612,34 @@ func reconstructDaemonSetPods(dspData []byte) []*v1.Pod {
 		daemonSetPods = append(daemonSetPods, &pod)
 	}
 	return daemonSetPods
+}
+
+func protoPVList(pvList *v1.PersistentVolumeList) []byte {
+	pvListData, err := pvList.Marshal()
+	if err != nil {
+		fmt.Println("Error marshaling PVList to JSON", err)
+		return nil
+	}
+	return pvListData
+}
+
+func reconstructPVList(pvListData []byte) *v1.PersistentVolumeList {
+	pvList := &v1.PersistentVolumeList{}
+	pvList.Unmarshal(pvListData)
+	return pvList
+}
+
+func protoPVCList(pvcList *v1.PersistentVolumeClaimList) []byte {
+	pvcListData, err := pvcList.Marshal()
+	if err != nil {
+		fmt.Println("Error marshaling PVCList to JSON", err)
+		return nil
+	}
+	return pvcListData
+}
+
+func reconstructPVCList(pvcListData []byte) *v1.PersistentVolumeClaimList {
+	pvcList := &v1.PersistentVolumeClaimList{}
+	pvcList.Unmarshal(pvcListData)
+	return pvcList
 }

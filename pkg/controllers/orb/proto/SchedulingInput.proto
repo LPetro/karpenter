@@ -23,6 +23,8 @@ message SchedulingInput {
   NodePoolsToInstanceTypes nodepoolstoinstancetypes_data = 6;
   optional bytes topology_data = 7;
   optional bytes daemonsetpods_data = 8;
+  optional bytes pvlist_data = 9;
+  optional bytes pvclist_data = 10;
 }
 
 message ReducedPod {

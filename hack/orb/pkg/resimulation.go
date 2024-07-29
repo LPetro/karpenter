@@ -40,7 +40,7 @@ import (
 
 // Resimulate from this scheduling input
 func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlFilepath string) (scheduler.Results, error) {
-	// ctx, op := operator.NewOperator()
+	ctx := context.Background()
 	// clock := op.Clock
 	// kubeClient := op.GetClient() // ??
 	// cluster := state.NewCluster(clock, kubeClient)
@@ -58,21 +58,14 @@ func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlF
 	stateNodes := getStateNodesFromSchedulingInput(reconstructedSchedulingInput)
 	instanceTypes := getInstanceTypesFromSchedulingInput(reconstructedSchedulingInput)
 	pods := reconstructedSchedulingInput.PendingPods
+	topology := reconstructedSchedulingInput.Topology
+	daemonSetPods := reconstructedSchedulingInput.DaemonSetPods
+
+	// DataClient := New
 
 	// How do I put bindings back into cluster? I just made this
 	// TODO: Check if this even works the way I want it to.
 	cluster.SetBindings(reconstructedSchedulingInput.Bindings)
-
-	topology, pods, err := getTopologyFromSchedulingInput(ctx, kubeClient, cluster, nodePools, instanceTypes, pods)
-	if err != nil {
-		fmt.Println("Error getting topology from scheduling input:", err)
-		return scheduler.Results{}, err
-	}
-
-	// DaemonSetPods? How can I pull this once?
-	daemonSetPods := []*v1.Pod{}
-
-	// topology
 
 	// TODO: Figure out why this makes Karpenter call the command-line arguments I've passed in; try to clear them or get around this
 	s := scheduler.NewScheduler(kubeClient, nodePools, cluster, stateNodes, topology, instanceTypes, daemonSetPods, nil)
@@ -81,7 +74,7 @@ func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlF
 	return scheduler.Results{}, nil
 }
 
-// TODO: Functionality not yet tested
+// TODO: Functionality not yet tested, needs to return []*NodePool
 func unmarshalNodePoolFromUser(nodepoolYamlFilepath string) (*v1beta1.NodePool, error) {
 	yamlFile, err := os.Open(nodepoolYamlFilepath)
 	if err != nil {
