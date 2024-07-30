@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/protobuf/proto"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 )
 
@@ -35,10 +34,10 @@ const (
 	schedulingMetadataKey key = iota
 )
 
-// WithSchedulingMetadata returns a new context with the provided scheduling metadata.
+// Returns a new context with the provided scheduling metadata.
 func WithSchedulingMetadata(ctx context.Context, action string, timestamp time.Time) context.Context {
 	switch action {
-	case "normal-provisioning", "single-node-consolidation", "multi-node-consolidation":
+	case "normal-provisioning", "single-node-consolidation", "multi-node-consolidation", "drift":
 		metadata := SchedulingMetadata{
 			Action:    action,
 			Timestamp: timestamp,
@@ -49,7 +48,7 @@ func WithSchedulingMetadata(ctx context.Context, action string, timestamp time.T
 	}
 }
 
-// GetProvisioningMetadata retrieves the scheduling metadata from the context.
+// Retrieves the scheduling metadata from the context.
 func GetSchedulingMetadata(ctx context.Context) (SchedulingMetadata, bool) {
 	metadata, ok := ctx.Value(schedulingMetadataKey).(SchedulingMetadata)
 	return metadata, ok
@@ -63,59 +62,9 @@ func protoSchedulingMetadata(metadata SchedulingMetadata) *pb.SchedulingMetadata
 }
 
 func reconstructSchedulingMetadata(mappingEntry *pb.SchedulingMetadataMap_MappingEntry) SchedulingMetadata {
-	timestamp, _ := time.Parse("2006-01-02_15-04-05", mappingEntry.Timestamp)
+	timestamp, _ := time.Parse("2006-01-02_15-04-05", mappingEntry.Timestamp) // Pre-validated by proto definition
 	return SchedulingMetadata{
 		Action:    mappingEntry.Action,
 		Timestamp: timestamp,
 	}
 }
-
-func UnmarshalSchedulingMetadataMap(data []byte) (*pb.SchedulingMetadataMap, error) {
-	var schedulingMetadataMap pb.SchedulingMetadataMap
-	err := proto.Unmarshal(data, &schedulingMetadataMap)
-	if err != nil {
-		return nil, err
-	}
-	return &schedulingMetadataMap, nil
-}
-
-// Function to unmarshal the metadata
-
-// // Reads in and parses all the scheduling metadata from the file in the PV.
-// // TODO: grab data based on a range of time.Time timestamps from files, via the range in their name.
-// func ReadSchedulingMetadataFromPV(timestampStr string) ([]*SchedulingMetadata, error) {
-// 	fileName := fmt.Sprintf("SchedulingMetadata_%s.log", timestampStr)
-// 	path := filepath.Join("/data", fileName)
-
-// 	file, err := os.Open(path)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-
-// 	var existingmetadata []*SchedulingMetadata
-// 	scanner := bufio.NewScanner(file)
-// 	for scanner.Scan() {
-// 		line := scanner.Text()
-// 		parts := strings.Split(line, "\t")
-// 		if len(parts) != 2 {
-// 			return nil, fmt.Errorf("invalid line format: %s", line)
-// 		}
-
-// 		timestamp, err := time.Parse("2006-01-02_15-04-05", parts[1])
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to parse timestamp: %v", err)
-// 		}
-
-// 		existingmetadata = append(existingmetadata, &SchedulingMetadata{
-// 			Timestamp: timestamp,
-// 			Action:    parts[0],
-// 		})
-// 	}
-
-// 	if err := scanner.Err(); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return existingmetadata, nil
-// }

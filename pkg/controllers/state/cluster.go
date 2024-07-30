@@ -598,7 +598,7 @@ func (c *Cluster) GetBindings() map[types.NamespacedName]string {
 	return bindings
 }
 
-// For ORB Logs, hydrates the cluster with the data from the ORB logs
+// Hydrates the cluster with the data from the ORB logs
 func (c *Cluster) ReconstructCluster(ctx context.Context, bindings map[types.NamespacedName]string, stateNodes []*StateNode, daemonSetPods []*v1.Pod, allPods *v1.PodList) {
 	// Set Bindings
 	c.bindings = bindings

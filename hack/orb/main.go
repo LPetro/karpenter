@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
 	"container/heap"
 	"encoding/json"
 	"flag"
@@ -26,14 +27,18 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	v1prov "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
 	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 
 	_ "knative.dev/pkg/system/testing"
 	"sigs.k8s.io/karpenter/hack/orb/pkg"
+
+	"sigs.k8s.io/karpenter/pkg/apis/v1beta1"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 	"sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
@@ -73,6 +78,33 @@ func init() {
 	flag.StringVar(&logPath, "dir", "", "Path to the directory containing logs")
 	flag.StringVar(&nodepoolsYamlFilepath, "yaml", "", "Path to the YAML file containing NodePool definitions")
 	flag.Parse()
+
+	// TODO: This is cloud provider specific and needs to be generalized. Without it, however, the Difference logic in Requirements/Offerings will fail.
+	v1beta1.RestrictedLabelDomains = v1beta1.RestrictedLabelDomains.Insert(v1prov.RestrictedLabelDomains...)
+	v1beta1.WellKnownLabels = v1beta1.WellKnownLabels.Insert(
+		v1prov.LabelInstanceHypervisor,
+		v1prov.LabelInstanceEncryptionInTransitSupported,
+		v1prov.LabelInstanceCategory,
+		v1prov.LabelInstanceFamily,
+		v1prov.LabelInstanceGeneration,
+		v1prov.LabelInstanceSize,
+		v1prov.LabelInstanceLocalNVME,
+		v1prov.LabelInstanceCPU,
+		v1prov.LabelInstanceCPUManufacturer,
+		v1prov.LabelInstanceMemory,
+		v1prov.LabelInstanceEBSBandwidth,
+		v1prov.LabelInstanceNetworkBandwidth,
+		v1prov.LabelInstanceGPUName,
+		v1prov.LabelInstanceGPUManufacturer,
+		v1prov.LabelInstanceGPUCount,
+		v1prov.LabelInstanceGPUMemory,
+		v1prov.LabelInstanceAcceleratorName,
+		v1prov.LabelInstanceAcceleratorManufacturer,
+		v1prov.LabelInstanceAcceleratorCount,
+		v1prov.LabelTopologyZoneID,
+		v1.LabelWindowsBuild,
+	)
+
 }
 
 // This conducts ORB Reconstruction from the command-line.
@@ -156,21 +188,21 @@ func readMetadataLogs() ([]*SchedulingMetadataOption, error) {
 }
 
 func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadataOption {
-	// reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Available options:")
 	for _, option := range options {
 		fmt.Println(option.String())
 	}
 
-	// fmt.Print("Enter the option number: ")
-	// input, _ := reader.ReadString('\n')
-	// input = strings.TrimSpace(input)
-	// choice, err := strconv.Atoi(input)
-	// if err != nil || choice < 0 || choice >= len(options) {
-	// 	fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
-	// 	return promptUserForOption(options)
-	// }
-	choice := 0
+	fmt.Print("Enter the option number: ")
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	choice, err := strconv.Atoi(input)
+	if err != nil || choice < 0 || choice >= len(options) {
+		fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
+		return promptUserForOption(options)
+	}
+	// choice := 0
 	return options[choice]
 }
 

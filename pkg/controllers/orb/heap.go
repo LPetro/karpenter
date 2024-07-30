@@ -104,14 +104,15 @@ func NewSchedulingMetadataHeap() *SchedulingMetadataHeap {
 	return h
 }
 
-// This function will log scheduling action to PV
 func (h *SchedulingMetadataHeap) LogSchedulingAction(ctx context.Context, schedulingTime time.Time) {
 	metadata, ok := GetSchedulingMetadata(ctx)
-	if !ok { // Provisioning metadata is not set, set it to the default - normal provisioning action
+	if !ok { // Provisioning metadata is not set in the context, set it to the default - normal provisioning action
 		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", schedulingTime)
 		metadata, _ = GetSchedulingMetadata(ctx) // Get it again to update metadata
 	}
-	// The resolves the time difference between the start of a consolidation call and the subsequent provisioning scheduling, overwriting with the scheduling time
+
+	// This allows us to reference metadata to its referred scheduling action. It resolves the time difference between the start of
+	// an action call (consolidation/drift) and its subsequent provisioning scheduling, overwriting with the scheduling time
 	metadata.Timestamp = schedulingTime
 
 	heap.Push(h, metadata)

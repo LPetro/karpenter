@@ -31,6 +31,7 @@ import (
 
 type ObjectKey = types.NamespacedName
 
+// An client which implements the minimal client interface to allow ORB to resimulate scheduling
 type DataClient struct {
 	persistentvolumeclaimlist *v1.PersistentVolumeClaimList
 	persistentvolumelist      *v1.PersistentVolumeList
@@ -43,7 +44,7 @@ func New(pvlist *v1.PersistentVolumeList, pvclist *v1.PersistentVolumeClaimList)
 	return d
 }
 
-// Currently the schudluer only needs to be able to read for the persistent volume and the persistent volume claim
+// Currently the scheduler only needs to be able to read for the persistent volume and the persistent volume claim
 func (d DataClient) Get(_ context.Context, key ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	if obj.GetObjectKind().GroupVersionKind().Kind == "PersistentVolumeClaim" {
 		objPVC, found := lo.Find(d.persistentvolumeclaimlist.Items, func(pvc v1.PersistentVolumeClaim) bool {
@@ -69,6 +70,8 @@ func (d DataClient) Get(_ context.Context, key ObjectKey, obj client.Object, opt
 
 	return nil
 }
+
+/* Empty interface definitions below. Not needed for resimulation */
 
 func (DataClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	return nil

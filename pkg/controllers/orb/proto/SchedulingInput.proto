@@ -2,18 +2,12 @@ syntax = "proto3";
 
 option go_package = "sigs.k8s.io/karpenter/pkg/controllers/orb/proto";
 
-// message SchedulingInputDifferencesMapping {
-//   repeated Differences differences = 1;
-// }
-
 message BatchedDifferences {
   repeated SchedulingInput added = 1;
   repeated SchedulingInput removed = 2;
   repeated SchedulingInput changed = 3;
 }
-
-// TODO: will need to be updated as I continue to update SchedulingInput
-// Anything as bytes are the self-describing wire format provided by K8s
+// Anything in bytes are the self-describing wire format provided by K8s
 message SchedulingInput {
   string timestamp = 1;
   repeated ReducedPod pendingpod_data = 2;
@@ -43,11 +37,26 @@ message ReducedPod {
   }
 }
 
-// A stateNode with the Pods it has on it.
+// A stateNode with the its associated Pods on it.
 message StateNodeWithPods {
   optional bytes node = 1;
   optional bytes nodeClaim = 2;
   repeated ReducedPod pods = 3;
+}
+
+// Bindings represents the mapping between a Pod and the node it's bound to.
+message Bindings {
+  repeated Binding binding = 1;
+
+  message Binding {
+    NamespacedName pod_namespaced_name = 1;
+    string node_name = 2;
+  
+    message NamespacedName {
+      string namespace = 1;
+      string name = 2;
+    }
+  }  
 }
 
 message InstanceType {
@@ -61,7 +70,7 @@ message InstanceType {
     string key = 1;
     string nodeselectoroperator = 2;
     repeated string values = 3;
-    optional int64 minvalues = 4; // This is a pointer in K8S representation, needs to be accordingly referenced/dereferenced with serialization/deserialization
+    optional int64 minvalues = 4;
   }
   
   message Offering {
@@ -93,31 +102,6 @@ message InstanceType {
   }
 }
 
-message SchedulingMetadataMap {
-  repeated MappingEntry entries = 1;
-
-  message MappingEntry {
-    string action = 1;
-    string timestamp = 2;
-  }
-}
-
-// Bindings represents the mapping between a Pod and the node it's bound to.
-message Bindings {
-  repeated Binding binding = 1;
-
-  message Binding {
-    NamespacedName pod_namespaced_name = 1;
-    string node_name = 2;
-  
-      // NamespacedName represents a Kubernetes resource's namespaced name.
-    message NamespacedName {
-      string namespace = 1;
-      string name = 2;
-    }
-  }  
-}
-
 // NodepoolsToInstanceTypes represents the mapping from each Nodepool to its set of InstanceTypes by name
 message NodePoolsToInstanceTypes {
   repeated NodePoolToInstanceTypes nodepoolstoinstancetypes = 1;
@@ -125,5 +109,14 @@ message NodePoolsToInstanceTypes {
   message NodePoolToInstanceTypes {
     string nodepool = 1;
     repeated string instancetype_name = 2;
+  }
+}
+
+message SchedulingMetadataMap {
+  repeated MappingEntry entries = 1;
+
+  message MappingEntry {
+    string action = 1;
+    string timestamp = 2;
   }
 }

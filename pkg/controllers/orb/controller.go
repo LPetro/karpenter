@@ -129,7 +129,6 @@ func (c *Controller) logSchedulingInputsToPV() error {
 
 func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	logdata, err := MarshalSchedulingInput(item)
-	// logdata, err := json.Marshal(item)
 	if err != nil {
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
@@ -150,9 +149,7 @@ func (c *Controller) logBatchedSchedulingDifferencesToPV(batchedDifferences []*S
 	}
 
 	start, end := GetTimeWindow(batchedDifferences)
-	startTimestampStr := start.Format("2006-01-02_15-04-05")
-	endTimestampStr := end.Format("2006-01-02_15-04-05")
-	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", startTimestampStr, endTimestampStr)
+	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", start.Format("2006-01-02_15-04-05"), end.Format("2006-01-02_15-04-05"))
 	path := filepath.Join("/data", fileName)
 
 	logdata, err := MarshalBatchedDifferences(batchedDifferences)

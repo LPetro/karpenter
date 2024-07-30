@@ -22,24 +22,18 @@ import (
 	"io"
 	"os"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/utils/clock"
 	_ "knative.dev/pkg/system/testing"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/karpenter/pkg/apis/v1beta1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
-	"sigs.k8s.io/karpenter/pkg/scheduling"
 )
 
-// Resimulate from this scheduling input
+// Resimulate a scheduling run using the scheduling input reconstructed from the logs.
 func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlFilepath string) (scheduler.Results, error) {
 	ctx := context.Background()
 
@@ -136,58 +130,4 @@ func getInstanceTypesFromSchedulingInput(schedulingInput *orb.SchedulingInput) m
 		}
 	}
 	return instanceTypes
-}
-
-// Calculate the Topology, copies the structure from provisioner.go
-func getTopologyFromSchedulingInput(ctx context.Context, kubeClient client.Client, cluster *state.Cluster, nodePools []*v1beta1.NodePool,
-	instanceTypes map[string][]*cloudprovider.InstanceType, pods []*v1.Pod) (*scheduler.Topology, []*v1.Pod, error) {
-	domains := map[string]sets.Set[string]{}
-	for _, nodePool := range nodePools {
-		instanceTypeOptions := instanceTypes[nodePool.Name]
-		// Construct Topology Domains
-		for _, instanceType := range instanceTypeOptions {
-			// We need to intersect the instance type requirements with the current nodePool requirements.  This
-			// ensures that something like zones from an instance type don't expand the universe of valid domains.
-			requirements := scheduling.NewNodeSelectorRequirementsWithMinValues(nodePool.Spec.Template.Spec.Requirements...)
-			requirements.Add(scheduling.NewLabelRequirements(nodePool.Spec.Template.Labels).Values()...)
-			requirements.Add(instanceType.Requirements.Values()...)
-
-			for key, requirement := range requirements {
-				// This code used to execute a Union between domains[key] and requirement.Values().
-				// The downside of this is that Union is immutable and takes a copy of the set it is executed upon.
-				// This resulted in a lot of memory pressure on the heap and poor performance
-				// https://github.com/aws/karpenter/issues/3565
-				if domains[key] == nil {
-					domains[key] = sets.New(requirement.Values()...)
-				} else {
-					domains[key].Insert(requirement.Values()...)
-				}
-			}
-		}
-
-		requirements := scheduling.NewNodeSelectorRequirementsWithMinValues(nodePool.Spec.Template.Spec.Requirements...)
-		requirements.Add(scheduling.NewLabelRequirements(nodePool.Spec.Template.Labels).Values()...)
-		for key, requirement := range requirements {
-			if requirement.Operator() == v1.NodeSelectorOpIn {
-				// The following is a performance optimisation, for the explanation see the comment above
-				if domains[key] == nil {
-					domains[key] = sets.New(requirement.Values()...)
-				} else {
-					domains[key].Insert(requirement.Values()...)
-				}
-			}
-		}
-	}
-	// inject topology constraints
-	var schedulablePods []*v1.Pod
-	volumeTopology := scheduler.NewVolumeTopology(kubeClient)
-	for _, pod := range pods {
-		if err := volumeTopology.Inject(ctx, pod); err != nil {
-			log.FromContext(ctx).WithValues("Pod", klog.KRef(pod.Namespace, pod.Name)).Error(err, "failed getting volume topology requirements")
-		} else {
-			schedulablePods = append(schedulablePods, pod)
-		}
-	}
-	topology, err := scheduler.NewTopology(ctx, kubeClient, cluster, domains, schedulablePods)
-	return topology, schedulablePods, err
 }

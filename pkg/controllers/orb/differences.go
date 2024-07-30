@@ -147,7 +147,7 @@ func GetTimeWindow(differences []*SchedulingInputDifferences) (time.Time, time.T
 	return start, end
 }
 
-// Pulls the cross-sectional slices of each Scheduling Input differences from a slice of Differences
+// Pulls the cross-sectional slices (added, removed, changed) of each Scheduling Input Differences
 func crossSection(differences []*SchedulingInputDifferences) ([]*SchedulingInput, []*SchedulingInput, []*SchedulingInput) {
 	allAdded := []*SchedulingInput{}
 	allRemoved := []*SchedulingInput{}
@@ -189,7 +189,6 @@ func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[tim
 	}
 
 	sort.Slice(batchedTimes, func(i, j int) bool { return batchedTimes[i].Before(batchedTimes[j]) })
-
 	return allAdded, allRemoved, allChanged, batchedTimes
 }
 
