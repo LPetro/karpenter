@@ -1,0 +1,1131 @@
+ExistingNodes:
+- Node:
+    metadata:
+      annotations:
+        alpha.kubernetes.io/provided-node-ip: 192.168.49.82
+        csi.volume.kubernetes.io/nodeid: '{"s3.csi.aws.com":"ip-192-168-49-82.us-west-2.compute.internal"}'
+        node.alpha.kubernetes.io/ttl: "0"
+        volumes.kubernetes.io/controller-managed-attach-detach: "true"
+      creationTimestamp: "2024-07-29T18:58:10Z"
+      labels:
+        alpha.eksctl.io/cluster-name: loupetro-karpenter-demo
+        alpha.eksctl.io/nodegroup-name: loupetro-karpenter-demo-ng
+        beta.kubernetes.io/arch: amd64
+        beta.kubernetes.io/instance-type: m5.large
+        beta.kubernetes.io/os: linux
+        eks.amazonaws.com/capacityType: ON_DEMAND
+        eks.amazonaws.com/nodegroup: loupetro-karpenter-demo-ng
+        eks.amazonaws.com/nodegroup-image: ami-0b5962c42db856256
+        eks.amazonaws.com/sourceLaunchTemplateId: lt-07efc3fd1d9659024
+        eks.amazonaws.com/sourceLaunchTemplateVersion: "1"
+        failure-domain.beta.kubernetes.io/region: us-west-2
+        failure-domain.beta.kubernetes.io/zone: us-west-2a
+        k8s.io/cloud-provider-aws: 1fd76c77bef38556c48ee18e3c478ba1
+        kubernetes.io/arch: amd64
+        kubernetes.io/hostname: ip-192-168-49-82.us-west-2.compute.internal
+        kubernetes.io/os: linux
+        node.kubernetes.io/instance-type: m5.large
+        topology.kubernetes.io/region: us-west-2
+        topology.kubernetes.io/zone: us-west-2a
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:labels:
+              f:beta.kubernetes.io/instance-type: {}
+              f:failure-domain.beta.kubernetes.io/region: {}
+              f:failure-domain.beta.kubernetes.io/zone: {}
+              f:k8s.io/cloud-provider-aws: {}
+              f:node.kubernetes.io/instance-type: {}
+              f:topology.kubernetes.io/region: {}
+              f:topology.kubernetes.io/zone: {}
+        manager: aws-cloud-controller-manager
+        operation: Update
+        time: "2024-07-29T18:58:10Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:status:
+            f:addresses:
+              k:{"type":"ExternalDNS"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+              k:{"type":"ExternalIP"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+              k:{"type":"InternalDNS"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+        manager: aws-cloud-controller-manager
+        operation: Update
+        subresource: status
+        time: "2024-07-29T18:58:10Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:alpha.kubernetes.io/provided-node-ip: {}
+              f:volumes.kubernetes.io/controller-managed-attach-detach: {}
+            f:labels:
+              .: {}
+              f:alpha.eksctl.io/cluster-name: {}
+              f:alpha.eksctl.io/nodegroup-name: {}
+              f:beta.kubernetes.io/arch: {}
+              f:beta.kubernetes.io/os: {}
+              f:eks.amazonaws.com/capacityType: {}
+              f:eks.amazonaws.com/nodegroup: {}
+              f:eks.amazonaws.com/nodegroup-image: {}
+              f:eks.amazonaws.com/sourceLaunchTemplateId: {}
+              f:eks.amazonaws.com/sourceLaunchTemplateVersion: {}
+              f:kubernetes.io/arch: {}
+              f:kubernetes.io/hostname: {}
+              f:kubernetes.io/os: {}
+          f:spec:
+            f:providerID: {}
+        manager: kubelet
+        operation: Update
+        time: "2024-07-29T18:58:10Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              f:node.alpha.kubernetes.io/ttl: {}
+        manager: kube-controller-manager
+        operation: Update
+        time: "2024-07-29T18:58:25Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              f:csi.volume.kubernetes.io/nodeid: {}
+          f:status:
+            f:conditions:
+              k:{"type":"DiskPressure"}:
+                f:lastHeartbeatTime: {}
+              k:{"type":"MemoryPressure"}:
+                f:lastHeartbeatTime: {}
+              k:{"type":"PIDPressure"}:
+                f:lastHeartbeatTime: {}
+              k:{"type":"Ready"}:
+                f:lastHeartbeatTime: {}
+                f:lastTransitionTime: {}
+                f:message: {}
+                f:reason: {}
+                f:status: {}
+            f:images: {}
+        manager: kubelet
+        operation: Update
+        subresource: status
+        time: "2024-07-30T01:34:02Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:spec:
+            f:taints: {}
+        manager: kubectl-taint
+        operation: Update
+        time: "2024-07-30T01:36:55Z"
+      name: ip-192-168-49-82.us-west-2.compute.internal
+      resourceVersion: "16792895"
+      uid: d7078566-3829-4db6-9ebe-015c1206d3cd
+    spec:
+      providerID: aws:///us-west-2a/i-0d894fbb300d1f559
+      taints:
+      - effect: NoSchedule
+        key: CriticalAddonsOnly
+        value: "true"
+    status:
+      addresses:
+      - address: 192.168.49.82
+        type: InternalIP
+      - address: 35.94.240.123
+        type: ExternalIP
+      - address: ip-192-168-49-82.us-west-2.compute.internal
+        type: InternalDNS
+      - address: ip-192-168-49-82.us-west-2.compute.internal
+        type: Hostname
+      - address: ec2-35-94-240-123.us-west-2.compute.amazonaws.com
+        type: ExternalDNS
+      allocatable:
+        cpu: 1930m
+        ephemeral-storage: "76224326324"
+        hugepages-1Gi: "0"
+        hugepages-2Mi: "0"
+        memory: 7134128Ki
+        pods: "29"
+      capacity:
+        cpu: "2"
+        ephemeral-storage: 83873772Ki
+        hugepages-1Gi: "0"
+        hugepages-2Mi: "0"
+        memory: 7824304Ki
+        pods: "29"
+      conditions:
+      - lastHeartbeatTime: "2024-07-30T01:34:02Z"
+        lastTransitionTime: "2024-07-29T18:58:09Z"
+        message: kubelet has sufficient memory available
+        reason: KubeletHasSufficientMemory
+        status: "False"
+        type: MemoryPressure
+      - lastHeartbeatTime: "2024-07-30T01:34:02Z"
+        lastTransitionTime: "2024-07-29T18:58:09Z"
+        message: kubelet has no disk pressure
+        reason: KubeletHasNoDiskPressure
+        status: "False"
+        type: DiskPressure
+      - lastHeartbeatTime: "2024-07-30T01:34:02Z"
+        lastTransitionTime: "2024-07-29T18:58:09Z"
+        message: kubelet has sufficient PID available
+        reason: KubeletHasSufficientPID
+        status: "False"
+        type: PIDPressure
+      - lastHeartbeatTime: "2024-07-30T01:34:02Z"
+        lastTransitionTime: "2024-07-29T18:58:25Z"
+        message: kubelet is posting ready status
+        reason: KubeletReady
+        status: "True"
+        type: Ready
+      daemonEndpoints:
+        kubeletEndpoint:
+          Port: 10250
+      images:
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon/aws-network-policy-agent@sha256:0e7fd75230dee735c1636ad86d69bf38b1bc48e1b78459147957827d978e5635
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon/aws-network-policy-agent:v1.0.7-eksbuild.1
+        sizeBytes: 291849978
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.18.2
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.18.2-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.18.2
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.18.2-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni-init:v1.18.2
+        sizeBytes: 61657659
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.16.0
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.16.0-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.16.0
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.16.0-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni-init:v1.16.0
+        sizeBytes: 61406699
+      - names:
+        - 654654269787.dkr.ecr.us-west-2.amazonaws.com/dev@sha256:f02907c7c11daf2671b1f43b3983d9dcdaf9cca98d0c07d735d9d3018d245a7b
+        sizeBytes: 47149896
+      - names:
+        - 654654269787.dkr.ecr.us-west-2.amazonaws.com/dev@sha256:01c239ffe590cb7a6a211eccab6f7c53e6baa4d93be03230cf28389490e22339
+        sizeBytes: 47128470
+      - names:
+        - 654654269787.dkr.ecr.us-west-2.amazonaws.com/dev@sha256:4f4582ecd727ab77478c9d59fa0ff61d27b1b76476c5cb7e7f1e8a9750174dc5
+        sizeBytes: 47121651
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.18.2
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.18.2-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.18.2
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.18.2-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni:v1.18.2
+        sizeBytes: 46784643
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.16.0
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.16.0-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.16.0
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.16.0-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni:v1.16.0
+        sizeBytes: 45423518
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/aws-s3-csi-driver@sha256:3b2931196a84451f23396d3a77de0405f53a5cec67e222c2fd1ad5ff85cd7719
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/aws-s3-csi-driver:v1.7.0
+        sizeBytes: 33206947
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        sizeBytes: 30850499
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        sizeBytes: 30688097
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns@sha256:25c8d2f85de97de3633c09553c65f1c34bc3e16b6d896e7e72ed01711eed3e0f
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns:v1.11.1-eksbuild.4
+        sizeBytes: 18623621
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/eks-pod-identity-agent@sha256:2cced85e4f3d218d753b6ae61b3926870a69b4cbd889a776b1d1f1fb2371e1b8
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/eks-pod-identity-agent:0.1.6
+        sizeBytes: 11941102
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/livenessprobe@sha256:665d64a8e1124ecd95e08626ddd140154be30a95c6574d423d66cf262d28cc9c
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/livenessprobe:v2.12.0-eks-1-30-4
+        sizeBytes: 8216245
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/csi-node-driver-registrar@sha256:518ed9cba6258735a25d2b896dc65d34a41e22f6785550a7e24e2f2dbd6a48b5
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/csi-node-driver-registrar:v2.10.1-eks-1-30-4
+        sizeBytes: 6930847
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/pause@sha256:529cf6b1b6e5b76e901abc43aee825badbd93f9c5ee5f1e316d46a83abbce5a2
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/pause:3.5
+        sizeBytes: 298689
+      nodeInfo:
+        architecture: amd64
+        bootID: cfb8ea5a-3953-4ad6-b605-56b28d583896
+        containerRuntimeVersion: containerd://1.7.11
+        kernelVersion: 5.10.219-208.866.amzn2.x86_64
+        kubeProxyVersion: v1.29.3-eks-ae9a62a
+        kubeletVersion: v1.29.3-eks-ae9a62a
+        machineID: ec248f6ac510df050fce32a220431eb3
+        operatingSystem: linux
+        osImage: Amazon Linux 2
+        systemUUID: ec248f6a-c510-df05-0fce-32a220431eb3
+  NodeClaim: null
+  Pods: null
+- Node:
+    metadata:
+      annotations:
+        alpha.kubernetes.io/provided-node-ip: 192.168.78.155
+        csi.volume.kubernetes.io/nodeid: '{"s3.csi.aws.com":"ip-192-168-78-155.us-west-2.compute.internal"}'
+        node.alpha.kubernetes.io/ttl: "0"
+        volumes.kubernetes.io/controller-managed-attach-detach: "true"
+      creationTimestamp: "2024-07-29T18:59:05Z"
+      labels:
+        alpha.eksctl.io/cluster-name: loupetro-karpenter-demo
+        alpha.eksctl.io/nodegroup-name: loupetro-karpenter-demo-ng
+        beta.kubernetes.io/arch: amd64
+        beta.kubernetes.io/instance-type: m5.large
+        beta.kubernetes.io/os: linux
+        eks.amazonaws.com/capacityType: ON_DEMAND
+        eks.amazonaws.com/nodegroup: loupetro-karpenter-demo-ng
+        eks.amazonaws.com/nodegroup-image: ami-0b5962c42db856256
+        eks.amazonaws.com/sourceLaunchTemplateId: lt-07efc3fd1d9659024
+        eks.amazonaws.com/sourceLaunchTemplateVersion: "1"
+        failure-domain.beta.kubernetes.io/region: us-west-2
+        failure-domain.beta.kubernetes.io/zone: us-west-2c
+        k8s.io/cloud-provider-aws: 1fd76c77bef38556c48ee18e3c478ba1
+        kubernetes.io/arch: amd64
+        kubernetes.io/hostname: ip-192-168-78-155.us-west-2.compute.internal
+        kubernetes.io/os: linux
+        node.kubernetes.io/instance-type: m5.large
+        topology.kubernetes.io/region: us-west-2
+        topology.kubernetes.io/zone: us-west-2c
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:labels:
+              f:beta.kubernetes.io/instance-type: {}
+              f:failure-domain.beta.kubernetes.io/region: {}
+              f:failure-domain.beta.kubernetes.io/zone: {}
+              f:k8s.io/cloud-provider-aws: {}
+              f:node.kubernetes.io/instance-type: {}
+              f:topology.kubernetes.io/region: {}
+              f:topology.kubernetes.io/zone: {}
+        manager: aws-cloud-controller-manager
+        operation: Update
+        time: "2024-07-29T18:59:05Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:status:
+            f:addresses:
+              k:{"type":"ExternalDNS"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+              k:{"type":"ExternalIP"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+              k:{"type":"InternalDNS"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+        manager: aws-cloud-controller-manager
+        operation: Update
+        subresource: status
+        time: "2024-07-29T18:59:05Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:alpha.kubernetes.io/provided-node-ip: {}
+              f:volumes.kubernetes.io/controller-managed-attach-detach: {}
+            f:labels:
+              .: {}
+              f:alpha.eksctl.io/cluster-name: {}
+              f:alpha.eksctl.io/nodegroup-name: {}
+              f:beta.kubernetes.io/arch: {}
+              f:beta.kubernetes.io/os: {}
+              f:eks.amazonaws.com/capacityType: {}
+              f:eks.amazonaws.com/nodegroup: {}
+              f:eks.amazonaws.com/nodegroup-image: {}
+              f:eks.amazonaws.com/sourceLaunchTemplateId: {}
+              f:eks.amazonaws.com/sourceLaunchTemplateVersion: {}
+              f:kubernetes.io/arch: {}
+              f:kubernetes.io/hostname: {}
+              f:kubernetes.io/os: {}
+          f:spec:
+            f:providerID: {}
+        manager: kubelet
+        operation: Update
+        time: "2024-07-29T18:59:05Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              f:node.alpha.kubernetes.io/ttl: {}
+        manager: kube-controller-manager
+        operation: Update
+        time: "2024-07-29T18:59:18Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              f:csi.volume.kubernetes.io/nodeid: {}
+          f:status:
+            f:conditions:
+              k:{"type":"DiskPressure"}:
+                f:lastHeartbeatTime: {}
+              k:{"type":"MemoryPressure"}:
+                f:lastHeartbeatTime: {}
+              k:{"type":"PIDPressure"}:
+                f:lastHeartbeatTime: {}
+              k:{"type":"Ready"}:
+                f:lastHeartbeatTime: {}
+                f:lastTransitionTime: {}
+                f:message: {}
+                f:reason: {}
+                f:status: {}
+            f:images: {}
+        manager: kubelet
+        operation: Update
+        subresource: status
+        time: "2024-07-30T01:34:03Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:spec:
+            f:taints: {}
+        manager: kubectl-taint
+        operation: Update
+        time: "2024-07-30T01:36:55Z"
+      name: ip-192-168-78-155.us-west-2.compute.internal
+      resourceVersion: "16792896"
+      uid: 60981ba6-d238-41fa-a5c3-3a2fa7af7906
+    spec:
+      providerID: aws:///us-west-2c/i-0c781c09ae1f271b7
+      taints:
+      - effect: NoSchedule
+        key: CriticalAddonsOnly
+        value: "true"
+    status:
+      addresses:
+      - address: 192.168.78.155
+        type: InternalIP
+      - address: 35.89.157.163
+        type: ExternalIP
+      - address: ip-192-168-78-155.us-west-2.compute.internal
+        type: InternalDNS
+      - address: ip-192-168-78-155.us-west-2.compute.internal
+        type: Hostname
+      - address: ec2-35-89-157-163.us-west-2.compute.amazonaws.com
+        type: ExternalDNS
+      allocatable:
+        cpu: 1930m
+        ephemeral-storage: "76224326324"
+        hugepages-1Gi: "0"
+        hugepages-2Mi: "0"
+        memory: 7134128Ki
+        pods: "29"
+      capacity:
+        cpu: "2"
+        ephemeral-storage: 83873772Ki
+        hugepages-1Gi: "0"
+        hugepages-2Mi: "0"
+        memory: 7824304Ki
+        pods: "29"
+      conditions:
+      - lastHeartbeatTime: "2024-07-30T01:34:03Z"
+        lastTransitionTime: "2024-07-29T18:59:03Z"
+        message: kubelet has sufficient memory available
+        reason: KubeletHasSufficientMemory
+        status: "False"
+        type: MemoryPressure
+      - lastHeartbeatTime: "2024-07-30T01:34:03Z"
+        lastTransitionTime: "2024-07-29T18:59:03Z"
+        message: kubelet has no disk pressure
+        reason: KubeletHasNoDiskPressure
+        status: "False"
+        type: DiskPressure
+      - lastHeartbeatTime: "2024-07-30T01:34:03Z"
+        lastTransitionTime: "2024-07-29T18:59:03Z"
+        message: kubelet has sufficient PID available
+        reason: KubeletHasSufficientPID
+        status: "False"
+        type: PIDPressure
+      - lastHeartbeatTime: "2024-07-30T01:34:03Z"
+        lastTransitionTime: "2024-07-29T18:59:18Z"
+        message: kubelet is posting ready status
+        reason: KubeletReady
+        status: "True"
+        type: Ready
+      daemonEndpoints:
+        kubeletEndpoint:
+          Port: 10250
+      images:
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon/aws-network-policy-agent@sha256:0e7fd75230dee735c1636ad86d69bf38b1bc48e1b78459147957827d978e5635
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon/aws-network-policy-agent:v1.0.7-eksbuild.1
+        sizeBytes: 291849978
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.18.2
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.18.2-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.18.2
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.18.2-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni-init:v1.18.2
+        sizeBytes: 61657659
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.16.0
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.16.0-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.16.0
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.16.0-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni-init:v1.16.0
+        sizeBytes: 61406699
+      - names:
+        - 654654269787.dkr.ecr.us-west-2.amazonaws.com/dev@sha256:f02907c7c11daf2671b1f43b3983d9dcdaf9cca98d0c07d735d9d3018d245a7b
+        sizeBytes: 47149896
+      - names:
+        - 654654269787.dkr.ecr.us-west-2.amazonaws.com/dev@sha256:01c239ffe590cb7a6a211eccab6f7c53e6baa4d93be03230cf28389490e22339
+        sizeBytes: 47128470
+      - names:
+        - 654654269787.dkr.ecr.us-west-2.amazonaws.com/dev@sha256:4f4582ecd727ab77478c9d59fa0ff61d27b1b76476c5cb7e7f1e8a9750174dc5
+        sizeBytes: 47121651
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.18.2
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.18.2-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.18.2
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.18.2-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni:v1.18.2
+        sizeBytes: 46784643
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.16.0
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.16.0-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.16.0
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.16.0-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni:v1.16.0
+        sizeBytes: 45423518
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/aws-s3-csi-driver@sha256:3b2931196a84451f23396d3a77de0405f53a5cec67e222c2fd1ad5ff85cd7719
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/aws-s3-csi-driver:v1.7.0
+        sizeBytes: 33206947
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/eks/kube-proxy:v1.29.3-minimal-eksbuild.5
+        sizeBytes: 30850499
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/eks/kube-proxy:v1.29.0-minimal-eksbuild.1
+        sizeBytes: 30688097
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns@sha256:25c8d2f85de97de3633c09553c65f1c34bc3e16b6d896e7e72ed01711eed3e0f
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns:v1.11.1-eksbuild.4
+        sizeBytes: 18623621
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/eks-pod-identity-agent@sha256:2cced85e4f3d218d753b6ae61b3926870a69b4cbd889a776b1d1f1fb2371e1b8
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/eks-pod-identity-agent:0.1.6
+        sizeBytes: 11941102
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/livenessprobe@sha256:665d64a8e1124ecd95e08626ddd140154be30a95c6574d423d66cf262d28cc9c
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/livenessprobe:v2.12.0-eks-1-30-4
+        sizeBytes: 8216245
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/csi-node-driver-registrar@sha256:518ed9cba6258735a25d2b896dc65d34a41e22f6785550a7e24e2f2dbd6a48b5
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/csi-node-driver-registrar:v2.10.1-eks-1-30-4
+        sizeBytes: 6930847
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/pause@sha256:529cf6b1b6e5b76e901abc43aee825badbd93f9c5ee5f1e316d46a83abbce5a2
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/pause:3.5
+        sizeBytes: 298689
+      nodeInfo:
+        architecture: amd64
+        bootID: e6e8f6ec-1de2-47d5-898b-d8ab2aef8ed9
+        containerRuntimeVersion: containerd://1.7.11
+        kernelVersion: 5.10.219-208.866.amzn2.x86_64
+        kubeProxyVersion: v1.29.3-eks-ae9a62a
+        kubeletVersion: v1.29.3-eks-ae9a62a
+        machineID: ec291603252fcea3fce4381a8ae2ca08
+        operatingSystem: linux
+        osImage: Amazon Linux 2
+        systemUUID: ec291603-252f-cea3-fce4-381a8ae2ca08
+  NodeClaim: null
+  Pods: null
+- Node:
+    metadata:
+      annotations:
+        alpha.kubernetes.io/provided-node-ip: 192.168.13.91
+        karpenter.k8s.aws/ec2nodeclass-hash: "283963079143094046"
+        karpenter.k8s.aws/ec2nodeclass-hash-version: v2
+        karpenter.sh/nodepool-hash: "15093649574832938182"
+        karpenter.sh/nodepool-hash-version: v2
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"karpenter.k8s.aws/v1beta1","kind":"EC2NodeClass","metadata":{"annotations":{},"name":"default"},"spec":{"amiFamily":"AL2","amiSelectorTerms":[{"id":"ami-0c337c0fdef02e03d"},{"id":"ami-092a6920570e49a06"}],"role":"KarpenterNodeRole-loupetro-karpenter-demo","securityGroupSelectorTerms":[{"tags":{"karpenter.sh/discovery":"loupetro-karpenter-demo"}}],"subnetSelectorTerms":[{"tags":{"karpenter.sh/discovery":"loupetro-karpenter-demo"}}]}}
+        node.alpha.kubernetes.io/ttl: "0"
+        volumes.kubernetes.io/controller-managed-attach-detach: "true"
+      creationTimestamp: "2024-07-30T01:37:39Z"
+      finalizers:
+      - karpenter.sh/termination
+      labels:
+        beta.kubernetes.io/arch: amd64
+        beta.kubernetes.io/instance-type: c4.2xlarge
+        beta.kubernetes.io/os: linux
+        failure-domain.beta.kubernetes.io/region: us-west-2
+        failure-domain.beta.kubernetes.io/zone: us-west-2b
+        k8s.io/cloud-provider-aws: 1fd76c77bef38556c48ee18e3c478ba1
+        karpenter.k8s.aws/instance-category: c
+        karpenter.k8s.aws/instance-cpu: "8"
+        karpenter.k8s.aws/instance-cpu-manufacturer: intel
+        karpenter.k8s.aws/instance-ebs-bandwidth: "1000"
+        karpenter.k8s.aws/instance-encryption-in-transit-supported: "false"
+        karpenter.k8s.aws/instance-family: c4
+        karpenter.k8s.aws/instance-generation: "4"
+        karpenter.k8s.aws/instance-hypervisor: xen
+        karpenter.k8s.aws/instance-memory: "15360"
+        karpenter.k8s.aws/instance-size: 2xlarge
+        karpenter.sh/capacity-type: spot
+        karpenter.sh/nodepool: default
+        karpenter.sh/registered: "true"
+        kubernetes.io/arch: amd64
+        kubernetes.io/hostname: ip-192-168-13-91.us-west-2.compute.internal
+        kubernetes.io/os: linux
+        node.kubernetes.io/instance-type: c4.2xlarge
+        topology.k8s.aws/zone-id: usw2-az1
+        topology.kubernetes.io/region: us-west-2
+        topology.kubernetes.io/zone: us-west-2b
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:labels:
+              f:beta.kubernetes.io/instance-type: {}
+              f:failure-domain.beta.kubernetes.io/region: {}
+              f:failure-domain.beta.kubernetes.io/zone: {}
+              f:k8s.io/cloud-provider-aws: {}
+        manager: aws-cloud-controller-manager
+        operation: Update
+        time: "2024-07-30T01:37:39Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:status:
+            f:addresses:
+              k:{"type":"ExternalDNS"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+              k:{"type":"ExternalIP"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+              k:{"type":"InternalDNS"}:
+                .: {}
+                f:address: {}
+                f:type: {}
+        manager: aws-cloud-controller-manager
+        operation: Update
+        subresource: status
+        time: "2024-07-30T01:37:39Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              f:karpenter.k8s.aws/ec2nodeclass-hash: {}
+              f:karpenter.k8s.aws/ec2nodeclass-hash-version: {}
+              f:karpenter.sh/nodepool-hash: {}
+              f:karpenter.sh/nodepool-hash-version: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+            f:finalizers:
+              .: {}
+              v:"karpenter.sh/termination": {}
+            f:labels:
+              f:karpenter.k8s.aws/instance-category: {}
+              f:karpenter.k8s.aws/instance-cpu: {}
+              f:karpenter.k8s.aws/instance-cpu-manufacturer: {}
+              f:karpenter.k8s.aws/instance-ebs-bandwidth: {}
+              f:karpenter.k8s.aws/instance-encryption-in-transit-supported: {}
+              f:karpenter.k8s.aws/instance-family: {}
+              f:karpenter.k8s.aws/instance-generation: {}
+              f:karpenter.k8s.aws/instance-hypervisor: {}
+              f:karpenter.k8s.aws/instance-memory: {}
+              f:karpenter.k8s.aws/instance-size: {}
+              f:karpenter.sh/registered: {}
+              f:node.kubernetes.io/instance-type: {}
+              f:topology.k8s.aws/zone-id: {}
+              f:topology.kubernetes.io/region: {}
+              f:topology.kubernetes.io/zone: {}
+            f:ownerReferences:
+              .: {}
+              k:{"uid":"e1918aad-f907-43e9-8a66-b5bc7a149be4"}: {}
+        manager: karpenter
+        operation: Update
+        time: "2024-07-30T01:37:39Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:alpha.kubernetes.io/provided-node-ip: {}
+              f:volumes.kubernetes.io/controller-managed-attach-detach: {}
+            f:labels:
+              .: {}
+              f:beta.kubernetes.io/arch: {}
+              f:beta.kubernetes.io/os: {}
+              f:karpenter.sh/capacity-type: {}
+              f:karpenter.sh/nodepool: {}
+              f:kubernetes.io/arch: {}
+              f:kubernetes.io/hostname: {}
+              f:kubernetes.io/os: {}
+          f:spec:
+            f:providerID: {}
+        manager: kubelet
+        operation: Update
+        time: "2024-07-30T01:37:39Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              f:node.alpha.kubernetes.io/ttl: {}
+          f:spec:
+            f:taints: {}
+        manager: kube-controller-manager
+        operation: Update
+        time: "2024-07-30T01:37:43Z"
+      name: ip-192-168-13-91.us-west-2.compute.internal
+      ownerReferences:
+      - apiVersion: karpenter.sh/v1beta1
+        blockOwnerDeletion: true
+        kind: NodeClaim
+        name: default-5shjd
+        uid: e1918aad-f907-43e9-8a66-b5bc7a149be4
+      resourceVersion: "16793146"
+      uid: 53053596-dec2-4861-87f9-fff22c0dd930
+    spec:
+      providerID: aws:///us-west-2b/i-03496694016a2ee7a
+      taints:
+      - effect: NoSchedule
+        key: node.kubernetes.io/not-ready
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        timeAdded: "2024-07-30T01:37:43Z"
+    status:
+      addresses:
+      - address: 192.168.13.91
+        type: InternalIP
+      - address: 54.218.226.162
+        type: ExternalIP
+      - address: ip-192-168-13-91.us-west-2.compute.internal
+        type: InternalDNS
+      - address: ip-192-168-13-91.us-west-2.compute.internal
+        type: Hostname
+      - address: ec2-54-218-226-162.us-west-2.compute.amazonaws.com
+        type: ExternalDNS
+      allocatable:
+        cpu: 7910m
+        ephemeral-storage: "18242267924"
+        hugepages-1Gi: "0"
+        hugepages-2Mi: "0"
+        memory: 14320488Ki
+        pods: "58"
+      capacity:
+        cpu: "8"
+        ephemeral-storage: 20959212Ki
+        hugepages-1Gi: "0"
+        hugepages-2Mi: "0"
+        memory: 15337320Ki
+        pods: "58"
+      conditions:
+      - lastHeartbeatTime: "2024-07-30T01:37:38Z"
+        lastTransitionTime: "2024-07-30T01:37:38Z"
+        message: kubelet has sufficient memory available
+        reason: KubeletHasSufficientMemory
+        status: "False"
+        type: MemoryPressure
+      - lastHeartbeatTime: "2024-07-30T01:37:38Z"
+        lastTransitionTime: "2024-07-30T01:37:38Z"
+        message: kubelet has no disk pressure
+        reason: KubeletHasNoDiskPressure
+        status: "False"
+        type: DiskPressure
+      - lastHeartbeatTime: "2024-07-30T01:37:38Z"
+        lastTransitionTime: "2024-07-30T01:37:38Z"
+        message: kubelet has sufficient PID available
+        reason: KubeletHasSufficientPID
+        status: "False"
+        type: PIDPressure
+      - lastHeartbeatTime: "2024-07-30T01:37:38Z"
+        lastTransitionTime: "2024-07-30T01:37:38Z"
+        message: '[container runtime network not ready: NetworkReady=false reason:NetworkPluginNotReady
+          message:Network plugin returns error: cni plugin not initialized, CSINode
+          is not yet initialized]'
+        reason: KubeletNotReady
+        status: "False"
+        type: Ready
+      daemonEndpoints:
+        kubeletEndpoint:
+          Port: 10250
+      images:
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni-init:v1.18.1-eksbuild.3
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni-init:v1.18.1-eksbuild.3
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni-init:v1.18.1-eksbuild.3
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/amazon-k8s-cni-init:v1.18.1-eksbuild.3
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/amazon-k8s-cni-init:v1.18.1-eksbuild.3
+        sizeBytes: 61539440
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/amazon-k8s-cni:v1.18.1-eksbuild.3
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/amazon-k8s-cni:v1.18.1-eksbuild.3
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/amazon-k8s-cni:v1.18.1-eksbuild.3
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/amazon-k8s-cni:v1.18.1-eksbuild.3
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/amazon-k8s-cni:v1.18.1-eksbuild.3
+        sizeBytes: 45911387
+      - names:
+        - 066635153087.dkr.ecr.il-central-1.amazonaws.com/eks/kube-proxy:v1.30.0-minimal-eksbuild.3
+        - 296578399912.dkr.ecr.ap-southeast-3.amazonaws.com/eks/kube-proxy:v1.30.0-minimal-eksbuild.3
+        - 455263428931.dkr.ecr.eu-south-2.amazonaws.com/eks/kube-proxy:v1.30.0-minimal-eksbuild.3
+        - 491585149902.dkr.ecr.ap-southeast-4.amazonaws.com/eks/kube-proxy:v1.30.0-minimal-eksbuild.3
+        - 558608220178.dkr.ecr.me-south-1.amazonaws.com/eks/kube-proxy:v1.30.0-minimal-eksbuild.3
+        sizeBytes: 31453936
+      - names:
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/pause@sha256:529cf6b1b6e5b76e901abc43aee825badbd93f9c5ee5f1e316d46a83abbce5a2
+        - 602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/pause:3.5
+        sizeBytes: 298689
+      nodeInfo:
+        architecture: amd64
+        bootID: 16109e5b-864b-4f8a-b17e-431a8be0bda1
+        containerRuntimeVersion: containerd://1.7.11
+        kernelVersion: 5.10.217-205.860.amzn2.x86_64
+        kubeProxyVersion: v1.30.0-eks-036c24b
+        kubeletVersion: v1.30.0-eks-036c24b
+        machineID: 805ddc629a1f46068f031170d7860752
+        operatingSystem: linux
+        osImage: Amazon Linux 2
+        systemUUID: ec22d9a9-abe5-168b-e229-33c586883e26
+  NodeClaim:
+    apiVersion: karpenter.sh/v1beta1
+    kind: NodeClaim
+    metadata:
+      annotations:
+        karpenter.k8s.aws/ec2nodeclass-hash: "283963079143094046"
+        karpenter.k8s.aws/ec2nodeclass-hash-version: v2
+        karpenter.k8s.aws/tagged: "true"
+        karpenter.sh/nodepool-hash: "15093649574832938182"
+        karpenter.sh/nodepool-hash-version: v2
+        kubectl.kubernetes.io/last-applied-configuration: |
+          {"apiVersion":"karpenter.k8s.aws/v1beta1","kind":"EC2NodeClass","metadata":{"annotations":{},"name":"default"},"spec":{"amiFamily":"AL2","amiSelectorTerms":[{"id":"ami-0c337c0fdef02e03d"},{"id":"ami-092a6920570e49a06"}],"role":"KarpenterNodeRole-loupetro-karpenter-demo","securityGroupSelectorTerms":[{"tags":{"karpenter.sh/discovery":"loupetro-karpenter-demo"}}],"subnetSelectorTerms":[{"tags":{"karpenter.sh/discovery":"loupetro-karpenter-demo"}}]}}
+      creationTimestamp: "2024-07-30T01:37:14Z"
+      finalizers:
+      - karpenter.sh/termination
+      generateName: default-
+      generation: 1
+      labels:
+        karpenter.k8s.aws/instance-category: c
+        karpenter.k8s.aws/instance-cpu: "8"
+        karpenter.k8s.aws/instance-cpu-manufacturer: intel
+        karpenter.k8s.aws/instance-ebs-bandwidth: "1000"
+        karpenter.k8s.aws/instance-encryption-in-transit-supported: "false"
+        karpenter.k8s.aws/instance-family: c4
+        karpenter.k8s.aws/instance-generation: "4"
+        karpenter.k8s.aws/instance-hypervisor: xen
+        karpenter.k8s.aws/instance-memory: "15360"
+        karpenter.k8s.aws/instance-size: 2xlarge
+        karpenter.sh/capacity-type: spot
+        karpenter.sh/nodepool: default
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+        node.kubernetes.io/instance-type: c4.2xlarge
+        topology.k8s.aws/zone-id: usw2-az1
+        topology.kubernetes.io/region: us-west-2
+        topology.kubernetes.io/zone: us-west-2b
+      managedFields:
+      - apiVersion: karpenter.sh/v1beta1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:status:
+            .: {}
+            f:allocatable:
+              .: {}
+              f:cpu: {}
+              f:ephemeral-storage: {}
+              f:memory: {}
+              f:pods: {}
+            f:capacity:
+              .: {}
+              f:cpu: {}
+              f:ephemeral-storage: {}
+              f:memory: {}
+              f:pods: {}
+            f:conditions: {}
+            f:imageID: {}
+            f:nodeName: {}
+            f:providerID: {}
+        manager: karpenter
+        operation: Update
+        subresource: status
+        time: "2024-07-30T01:37:39Z"
+      - apiVersion: karpenter.sh/v1beta1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:karpenter.k8s.aws/ec2nodeclass-hash: {}
+              f:karpenter.k8s.aws/ec2nodeclass-hash-version: {}
+              f:karpenter.k8s.aws/tagged: {}
+              f:karpenter.sh/nodepool-hash: {}
+              f:karpenter.sh/nodepool-hash-version: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+            f:finalizers:
+              .: {}
+              v:"karpenter.sh/termination": {}
+            f:generateName: {}
+            f:labels:
+              .: {}
+              f:karpenter.k8s.aws/instance-category: {}
+              f:karpenter.k8s.aws/instance-cpu: {}
+              f:karpenter.k8s.aws/instance-cpu-manufacturer: {}
+              f:karpenter.k8s.aws/instance-ebs-bandwidth: {}
+              f:karpenter.k8s.aws/instance-encryption-in-transit-supported: {}
+              f:karpenter.k8s.aws/instance-family: {}
+              f:karpenter.k8s.aws/instance-generation: {}
+              f:karpenter.k8s.aws/instance-hypervisor: {}
+              f:karpenter.k8s.aws/instance-memory: {}
+              f:karpenter.k8s.aws/instance-size: {}
+              f:karpenter.sh/capacity-type: {}
+              f:karpenter.sh/nodepool: {}
+              f:kubernetes.io/arch: {}
+              f:kubernetes.io/os: {}
+              f:node.kubernetes.io/instance-type: {}
+              f:topology.k8s.aws/zone-id: {}
+              f:topology.kubernetes.io/region: {}
+              f:topology.kubernetes.io/zone: {}
+            f:ownerReferences:
+              .: {}
+              k:{"uid":"80562cb7-a2a8-4837-82af-173efe048b12"}: {}
+          f:spec:
+            .: {}
+            f:nodeClassRef:
+              .: {}
+              f:apiVersion: {}
+              f:kind: {}
+              f:name: {}
+            f:requirements: {}
+            f:resources:
+              .: {}
+              f:requests:
+                .: {}
+                f:cpu: {}
+                f:memory: {}
+                f:pods: {}
+        manager: karpenter
+        operation: Update
+        time: "2024-07-30T01:37:40Z"
+      name: default-5shjd
+      ownerReferences:
+      - apiVersion: karpenter.sh/v1beta1
+        blockOwnerDeletion: true
+        kind: NodePool
+        name: default
+        uid: 80562cb7-a2a8-4837-82af-173efe048b12
+      resourceVersion: "16793123"
+      uid: e1918aad-f907-43e9-8a66-b5bc7a149be4
+    spec:
+      nodeClassRef:
+        apiVersion: karpenter.k8s.aws/v1beta1
+        kind: EC2NodeClass
+        name: default
+      requirements:
+      - key: karpenter.k8s.aws/instance-generation
+        operator: Gt
+        values:
+        - "2"
+      - key: karpenter.sh/nodepool
+        operator: In
+        values:
+        - default
+      - key: node.kubernetes.io/instance-type
+        operator: In
+        values:
+        - c3.2xlarge
+        - c4.2xlarge
+        - c5.2xlarge
+        - c5.4xlarge
+        - c5a.2xlarge
+        - c5a.4xlarge
+        - c5ad.2xlarge
+        - c5ad.4xlarge
+        - c5d.2xlarge
+        - c5n.2xlarge
+        - c6a.2xlarge
+        - c6a.4xlarge
+        - c6i.2xlarge
+        - c6i.4xlarge
+        - c6id.2xlarge
+        - c6id.4xlarge
+        - c6in.2xlarge
+        - c7a.2xlarge
+        - c7a.4xlarge
+        - c7a.8xlarge
+        - c7i.2xlarge
+        - c7i.4xlarge
+        - m3.2xlarge
+        - m4.2xlarge
+        - m5.2xlarge
+        - m5a.2xlarge
+        - m5ad.2xlarge
+        - m5d.2xlarge
+        - m5dn.2xlarge
+        - m5n.2xlarge
+        - m5zn.2xlarge
+        - m6a.2xlarge
+        - m6a.4xlarge
+        - m6i.2xlarge
+        - m6i.4xlarge
+        - m6id.2xlarge
+        - m6id.4xlarge
+        - m6idn.2xlarge
+        - m6in.2xlarge
+        - m7a.2xlarge
+        - m7i-flex.2xlarge
+        - m7i-flex.4xlarge
+        - m7i-flex.8xlarge
+        - m7i.2xlarge
+        - m7i.4xlarge
+        - r3.2xlarge
+        - r5.2xlarge
+        - r5a.2xlarge
+        - r5ad.2xlarge
+        - r5d.2xlarge
+        - r5n.2xlarge
+        - r6a.2xlarge
+        - r6i.2xlarge
+        - r6id.2xlarge
+        - r6in.2xlarge
+        - r7a.2xlarge
+        - r7i.2xlarge
+        - r7i.4xlarge
+        - r7i.8xlarge
+        - r7iz.2xlarge
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+      - key: kubernetes.io/os
+        operator: In
+        values:
+        - linux
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values:
+        - spot
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values:
+        - c
+        - m
+        - r
+      resources:
+        requests:
+          cpu: 5180m
+          memory: 2680Mi
+          pods: "9"
+    status:
+      allocatable:
+        cpu: 7910m
+        ephemeral-storage: 17Gi
+        memory: 13215Mi
+        pods: "58"
+      capacity:
+        cpu: "8"
+        ephemeral-storage: 20Gi
+        memory: 14208Mi
+        pods: "58"
+      conditions:
+      - lastTransitionTime: "2024-07-30T01:37:39Z"
+        message: Node status is NotReady
+        reason: NodeNotReady
+        status: "False"
+        type: Initialized
+      - lastTransitionTime: "2024-07-30T01:37:17Z"
+        message: ""
+        reason: Launched
+        status: "True"
+        type: Launched
+      - lastTransitionTime: "2024-07-30T01:37:39Z"
+        message: Initialized=False
+        reason: UnhealthyDependents
+        status: "False"
+        type: Ready
+      - lastTransitionTime: "2024-07-30T01:37:39Z"
+        message: ""
+        reason: Registered
+        status: "True"
+        type: Registered
+      imageID: ami-092a6920570e49a06
+      nodeName: ip-192-168-13-91.us-west-2.compute.internal
+      providerID: aws:///us-west-2b/i-03496694016a2ee7a
+  Pods: null
+NewNodeClaims: null
+PodErrors:
+- Key: '&Pod{ObjectMeta:{inflate-7dcbd789-mjlw2  default  c5c1e51b-719c-4d62-b577-4da14939fdd9  0
+    0001-01-01 00:00:00 +0000 UTC <nil> <nil> map[] map[] [] [] []},Spec:PodSpec{Volumes:[]Volume{},Containers:[]Container{},RestartPolicy:,TerminationGracePeriodSeconds:nil,ActiveDeadlineSeconds:nil,DNSPolicy:,NodeSelector:map[string]string{},ServiceAccountName:,DeprecatedServiceAccount:,NodeName:,HostNetwork:false,HostPID:false,HostIPC:false,SecurityContext:nil,ImagePullSecrets:[]LocalObjectReference{},Hostname:,Subdomain:,Affinity:nil,SchedulerName:,InitContainers:[]Container{},AutomountServiceAccountToken:nil,Tolerations:[]Toleration{},HostAliases:[]HostAlias{},PriorityClassName:,Priority:nil,DNSConfig:nil,ShareProcessNamespace:nil,ReadinessGates:[]PodReadinessGate{},RuntimeClassName:nil,EnableServiceLinks:nil,PreemptionPolicy:nil,Overhead:ResourceList{},TopologySpreadConstraints:[]TopologySpreadConstraint{},EphemeralContainers:[]EphemeralContainer{},SetHostnameAsFQDN:nil,OS:nil,HostUsers:nil,SchedulingGates:[]PodSchedulingGate{},ResourceClaims:[]PodResourceClaim{},},Status:PodStatus{Phase:Pending,Conditions:[]PodCondition{PodCondition{Type:PodScheduled,Status:False,LastProbeTime:0001-01-01
+    00:00:00 +0000 UTC,LastTransitionTime:0001-01-01 00:00:00 +0000 UTC,Reason:Unschedulable,Message:0/2
+    nodes are available: 2 node(s) had untolerated taint {CriticalAddonsOnly: true}.
+    preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.,},},Message:,Reason:,HostIP:,PodIP:,StartTime:<nil>,ContainerStatuses:[]ContainerStatus{},QOSClass:,InitContainerStatuses:[]ContainerStatus{},NominatedNodeName:,PodIPs:[]PodIP{},EphemeralContainerStatuses:[]ContainerStatus{},Resize:,ResourceClaimStatuses:[]PodResourceClaimStatus{},HostIPs:[]HostIP{},},}'
+  Value: 'all available instance types exceed limits for nodepool: "default"'
+- Key: '&Pod{ObjectMeta:{inflate-7dcbd789-5lmfr  default  e0fee4c5-c04d-4de1-9396-58d4eb8098b0  0
+    0001-01-01 00:00:00 +0000 UTC <nil> <nil> map[] map[] [] [] []},Spec:PodSpec{Volumes:[]Volume{},Containers:[]Container{},RestartPolicy:,TerminationGracePeriodSeconds:nil,ActiveDeadlineSeconds:nil,DNSPolicy:,NodeSelector:map[string]string{},ServiceAccountName:,DeprecatedServiceAccount:,NodeName:,HostNetwork:false,HostPID:false,HostIPC:false,SecurityContext:nil,ImagePullSecrets:[]LocalObjectReference{},Hostname:,Subdomain:,Affinity:nil,SchedulerName:,InitContainers:[]Container{},AutomountServiceAccountToken:nil,Tolerations:[]Toleration{},HostAliases:[]HostAlias{},PriorityClassName:,Priority:nil,DNSConfig:nil,ShareProcessNamespace:nil,ReadinessGates:[]PodReadinessGate{},RuntimeClassName:nil,EnableServiceLinks:nil,PreemptionPolicy:nil,Overhead:ResourceList{},TopologySpreadConstraints:[]TopologySpreadConstraint{},EphemeralContainers:[]EphemeralContainer{},SetHostnameAsFQDN:nil,OS:nil,HostUsers:nil,SchedulingGates:[]PodSchedulingGate{},ResourceClaims:[]PodResourceClaim{},},Status:PodStatus{Phase:Pending,Conditions:[]PodCondition{PodCondition{Type:PodScheduled,Status:False,LastProbeTime:0001-01-01
+    00:00:00 +0000 UTC,LastTransitionTime:0001-01-01 00:00:00 +0000 UTC,Reason:Unschedulable,Message:0/2
+    nodes are available: 2 node(s) had untolerated taint {CriticalAddonsOnly: true}.
+    preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.,},},Message:,Reason:,HostIP:,PodIP:,StartTime:<nil>,ContainerStatuses:[]ContainerStatus{},QOSClass:,InitContainerStatuses:[]ContainerStatus{},NominatedNodeName:,PodIPs:[]PodIP{},EphemeralContainerStatuses:[]ContainerStatus{},Resize:,ResourceClaimStatuses:[]PodResourceClaimStatus{},HostIPs:[]HostIP{},},}'
+  Value: 'all available instance types exceed limits for nodepool: "default"'
+- Key: '&Pod{ObjectMeta:{inflate-7dcbd789-w9nrm  default  1bb85209-4736-4a0b-b16a-8eaf35fd24a3  0
+    0001-01-01 00:00:00 +0000 UTC <nil> <nil> map[] map[] [] [] []},Spec:PodSpec{Volumes:[]Volume{},Containers:[]Container{},RestartPolicy:,TerminationGracePeriodSeconds:nil,ActiveDeadlineSeconds:nil,DNSPolicy:,NodeSelector:map[string]string{},ServiceAccountName:,DeprecatedServiceAccount:,NodeName:,HostNetwork:false,HostPID:false,HostIPC:false,SecurityContext:nil,ImagePullSecrets:[]LocalObjectReference{},Hostname:,Subdomain:,Affinity:nil,SchedulerName:,InitContainers:[]Container{},AutomountServiceAccountToken:nil,Tolerations:[]Toleration{},HostAliases:[]HostAlias{},PriorityClassName:,Priority:nil,DNSConfig:nil,ShareProcessNamespace:nil,ReadinessGates:[]PodReadinessGate{},RuntimeClassName:nil,EnableServiceLinks:nil,PreemptionPolicy:nil,Overhead:ResourceList{},TopologySpreadConstraints:[]TopologySpreadConstraint{},EphemeralContainers:[]EphemeralContainer{},SetHostnameAsFQDN:nil,OS:nil,HostUsers:nil,SchedulingGates:[]PodSchedulingGate{},ResourceClaims:[]PodResourceClaim{},},Status:PodStatus{Phase:Pending,Conditions:[]PodCondition{PodCondition{Type:PodScheduled,Status:False,LastProbeTime:0001-01-01
+    00:00:00 +0000 UTC,LastTransitionTime:0001-01-01 00:00:00 +0000 UTC,Reason:Unschedulable,Message:0/2
+    nodes are available: 2 node(s) had untolerated taint {CriticalAddonsOnly: true}.
+    preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.,},},Message:,Reason:,HostIP:,PodIP:,StartTime:<nil>,ContainerStatuses:[]ContainerStatus{},QOSClass:,InitContainerStatuses:[]ContainerStatus{},NominatedNodeName:,PodIPs:[]PodIP{},EphemeralContainerStatuses:[]ContainerStatus{},Resize:,ResourceClaimStatuses:[]PodResourceClaimStatus{},HostIPs:[]HostIP{},},}'
+  Value: 'all available instance types exceed limits for nodepool: "default"'
+- Key: '&Pod{ObjectMeta:{inflate-7dcbd789-zzdjv  default  526e71a8-c87f-4724-ae5f-282170052501  0
+    0001-01-01 00:00:00 +0000 UTC <nil> <nil> map[] map[] [] [] []},Spec:PodSpec{Volumes:[]Volume{},Containers:[]Container{},RestartPolicy:,TerminationGracePeriodSeconds:nil,ActiveDeadlineSeconds:nil,DNSPolicy:,NodeSelector:map[string]string{},ServiceAccountName:,DeprecatedServiceAccount:,NodeName:,HostNetwork:false,HostPID:false,HostIPC:false,SecurityContext:nil,ImagePullSecrets:[]LocalObjectReference{},Hostname:,Subdomain:,Affinity:nil,SchedulerName:,InitContainers:[]Container{},AutomountServiceAccountToken:nil,Tolerations:[]Toleration{},HostAliases:[]HostAlias{},PriorityClassName:,Priority:nil,DNSConfig:nil,ShareProcessNamespace:nil,ReadinessGates:[]PodReadinessGate{},RuntimeClassName:nil,EnableServiceLinks:nil,PreemptionPolicy:nil,Overhead:ResourceList{},TopologySpreadConstraints:[]TopologySpreadConstraint{},EphemeralContainers:[]EphemeralContainer{},SetHostnameAsFQDN:nil,OS:nil,HostUsers:nil,SchedulingGates:[]PodSchedulingGate{},ResourceClaims:[]PodResourceClaim{},},Status:PodStatus{Phase:Pending,Conditions:[]PodCondition{PodCondition{Type:PodScheduled,Status:False,LastProbeTime:0001-01-01
+    00:00:00 +0000 UTC,LastTransitionTime:0001-01-01 00:00:00 +0000 UTC,Reason:Unschedulable,Message:0/2
+    nodes are available: 2 node(s) had untolerated taint {CriticalAddonsOnly: true}.
+    preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.,},},Message:,Reason:,HostIP:,PodIP:,StartTime:<nil>,ContainerStatuses:[]ContainerStatus{},QOSClass:,InitContainerStatuses:[]ContainerStatus{},NominatedNodeName:,PodIPs:[]PodIP{},EphemeralContainerStatuses:[]ContainerStatus{},Resize:,ResourceClaimStatuses:[]PodResourceClaimStatus{},HostIPs:[]HostIP{},},}'
+  Value: 'all available instance types exceed limits for nodepool: "default"'
+- Key: '&Pod{ObjectMeta:{inflate-7dcbd789-x55tr  default  67b792f1-ebe6-4e41-9627-0926844e22d1  0
+    0001-01-01 00:00:00 +0000 UTC <nil> <nil> map[] map[] [] [] []},Spec:PodSpec{Volumes:[]Volume{},Containers:[]Container{},RestartPolicy:,TerminationGracePeriodSeconds:nil,ActiveDeadlineSeconds:nil,DNSPolicy:,NodeSelector:map[string]string{},ServiceAccountName:,DeprecatedServiceAccount:,NodeName:,HostNetwork:false,HostPID:false,HostIPC:false,SecurityContext:nil,ImagePullSecrets:[]LocalObjectReference{},Hostname:,Subdomain:,Affinity:nil,SchedulerName:,InitContainers:[]Container{},AutomountServiceAccountToken:nil,Tolerations:[]Toleration{},HostAliases:[]HostAlias{},PriorityClassName:,Priority:nil,DNSConfig:nil,ShareProcessNamespace:nil,ReadinessGates:[]PodReadinessGate{},RuntimeClassName:nil,EnableServiceLinks:nil,PreemptionPolicy:nil,Overhead:ResourceList{},TopologySpreadConstraints:[]TopologySpreadConstraint{},EphemeralContainers:[]EphemeralContainer{},SetHostnameAsFQDN:nil,OS:nil,HostUsers:nil,SchedulingGates:[]PodSchedulingGate{},ResourceClaims:[]PodResourceClaim{},},Status:PodStatus{Phase:Pending,Conditions:[]PodCondition{PodCondition{Type:PodScheduled,Status:False,LastProbeTime:0001-01-01
+    00:00:00 +0000 UTC,LastTransitionTime:0001-01-01 00:00:00 +0000 UTC,Reason:Unschedulable,Message:0/2
+    nodes are available: 2 node(s) had untolerated taint {CriticalAddonsOnly: true}.
+    preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.,},},Message:,Reason:,HostIP:,PodIP:,StartTime:<nil>,ContainerStatuses:[]ContainerStatus{},QOSClass:,InitContainerStatuses:[]ContainerStatus{},NominatedNodeName:,PodIPs:[]PodIP{},EphemeralContainerStatuses:[]ContainerStatus{},Resize:,ResourceClaimStatuses:[]PodResourceClaimStatus{},HostIPs:[]HostIP{},},}'
+  Value: 'all available instance types exceed limits for nodepool: "default"'
