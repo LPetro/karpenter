@@ -61,6 +61,7 @@ message InstanceType {
     string key = 1;
     string nodeselectoroperator = 2;
     repeated string values = 3;
+    optional int64 minvalues = 4; // This is a pointer in K8S representation, needs to be accordingly referenced/dereferenced with serialization/deserialization
   }
   
   message Offering {

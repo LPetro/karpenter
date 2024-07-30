@@ -463,7 +463,7 @@ func mergeScheduledPodList(iteratingScheduledPodList *v1.PodList, differences *S
 // Helper function to map the baseline pods by UID
 
 // Functions to check the differences in all the fields of a SchedulingInput (except the timestamp)
-func (si *SchedulingInput) Diff(oldSi *SchedulingInput) *SchedulingInputDifferences {
+func (oldSi *SchedulingInput) Diff(si *SchedulingInput) *SchedulingInputDifferences {
 	// Determine the differences in each of the fields of ScheduleInput
 	podDiff := diffPods(oldSi.PendingPods, si.PendingPods)
 	snpDiff := diffStateNodes(oldSi.StateNodesWithPods, si.StateNodesWithPods)

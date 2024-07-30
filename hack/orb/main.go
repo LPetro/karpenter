@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"bufio"
 	"container/heap"
 	"encoding/json"
 	"flag"
@@ -27,7 +26,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -158,21 +156,21 @@ func readMetadataLogs() ([]*SchedulingMetadataOption, error) {
 }
 
 func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadataOption {
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Available options:")
 	for _, option := range options {
 		fmt.Println(option.String())
 	}
 
-	fmt.Print("Enter the option number: ")
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 0 || choice >= len(options) {
-		fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
-		return promptUserForOption(options)
-	}
-	// choice := 0
+	// fmt.Print("Enter the option number: ")
+	// input, _ := reader.ReadString('\n')
+	// input = strings.TrimSpace(input)
+	// choice, err := strconv.Atoi(input)
+	// if err != nil || choice < 0 || choice >= len(options) {
+	// 	fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
+	// 	return promptUserForOption(options)
+	// }
+	choice := 0
 	return options[choice]
 }
 

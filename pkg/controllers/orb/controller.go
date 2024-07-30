@@ -113,7 +113,7 @@ func (c *Controller) logSchedulingInputsToPV() error {
 			c.mostRecentBaseline = &currentInput
 			c.shouldRebaseline = false
 		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
-			currentDifferences := currentInput.Diff(c.mostRecentBaseline)
+			currentDifferences := c.mostRecentBaseline.Diff(&currentInput)
 			batchedDifferences = append(batchedDifferences, currentDifferences)
 			c.shouldRebaseline = c.determineRebaseline(currentDifferences.getByteSize())
 		}

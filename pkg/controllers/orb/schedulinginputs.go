@@ -40,9 +40,9 @@ import (
 )
 
 type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshal definition
-// type Topology *scheduler.Topology                // Alias for JSON Marshaling
 
-// These are the inputs to the scheduling function (scheduler.NewSchedule) which change more dynamically
+// These are the inputs to the scheduling function (scheduler.NewSchedule) which we'll serialize and log
+// for later deserialization, reconstruction and resimulation in the ORB Debugging Tool
 type SchedulingInput struct {
 	Timestamp             time.Time
 	PendingPods           []*v1.Pod
@@ -63,24 +63,6 @@ type StateNodeWithPods struct {
 	NodeClaim *v1beta1.NodeClaim
 	Pods      []*v1.Pod
 }
-
-// // These are the fields of topology not associated with the kubeClient or Cluster.
-// type IsolatedTopology struct {
-// 	// Both the topologies and inverseTopologies are maps of the hash from TopologyGroup.Hash() to the topology group
-// 	// itself. This is used to allow us to store one topology group that tracks the topology of many pods instead of
-// 	// having a 1<->1 mapping between topology groups and pods owned/selected by that group.
-// 	topologies map[uint64]*scheduler.TopologyGroup
-// 	// Anti-affinity works both ways (if a zone has a pod foo with anti-affinity to a pod bar, we can't schedule bar to
-// 	// that zone, even though bar has no anti affinity terms on it. For this to work, we need to separately track the
-// 	// topologies of pods with anti-affinity terms, so we can prevent scheduling the pods they have anti-affinity to
-// 	// in some cases.
-// 	inverseTopologies map[uint64]*scheduler.TopologyGroup
-// 	// The universe of domains by topology key
-// 	domains map[string]sets.Set[string]
-// 	// excludedPods are the pod UIDs of pods that are excluded from counting.  This is used so we can simulate
-// 	// moving pods to prevent them from being double counted.
-// 	excludedPods sets.Set[string]
-// }
 
 // Construct and reduce the Scheduling Input down to what's minimally required for re-simulation
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod, stateNodes []*state.StateNode,
@@ -249,6 +231,7 @@ func reducePodConditions(conditions []v1.PodCondition) []v1.PodCondition {
 	return reducedConditions
 }
 
+// Just the exportable Node and NodeClaim in StateNode
 func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	reducedStateNodes := []*state.StateNode{}
 	for _, node := range nodes {
@@ -263,45 +246,6 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	}
 	return reducedStateNodes
 }
-
-// func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings {
-// 	strippedOfferings := cloudprovider.Offerings{}
-// 	for _, offering := range offerings {
-// 		strippedOffering := &cloudprovider.Offering{
-// 			Requirements: reduceRequirements(offering.Requirements), // TODO: should I be reducing these?
-// 			Price:        offering.Price,
-// 			Available:    offering.Available,
-// 		}
-// 		strippedOfferings = append(strippedOfferings, *strippedOffering)
-// 	}
-// 	return strippedOfferings
-// }
-
-// // Reduce Requirements returns Requirements of these keys: karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
-// // TODO Should these keys be called more generically? i.e. via v1beta1.CapacityTypeLabelKey, v1.LabelTopologyZone or something?
-// func reduceRequirements(requirements scheduling.Requirements) scheduling.Requirements {
-// 	reducedRequirements := scheduling.Requirements{}
-// 	for key, value := range requirements {
-// 		switch key {
-// 		case "karpenter.sh/capacity-type", "topology.k8s.aws/zone-id", "topology.kubernetes.io/zone":
-// 			reducedRequirements[key] = value
-// 		}
-// 	}
-// 	return reducedRequirements
-// }
-
-// func ReduceInstanceTypes(its []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
-// 	reducedInstanceTypes := []*cloudprovider.InstanceType{}
-// 	for _, it := range its {
-// 		reducedInstanceType := &cloudprovider.InstanceType{
-// 			Name:         it.Name,
-// 			Requirements: reduceRequirements(it.Requirements),
-// 			Offerings:    reduceOfferings(it.Offerings),
-// 		}
-// 		reducedInstanceTypes = append(reducedInstanceTypes, reducedInstanceType)
-// 	}
-// 	return reducedInstanceTypes
-// }
 
 /* Functions to convert between SchedulingInputs and the proto-defined version
    Via pairs: Marshal <--> Unmarshal and proto <--> reconstruct */
@@ -502,6 +446,13 @@ func protoRequirements(requirements scheduling.Requirements) []*pb.InstanceType_
 			Key:                  requirement.Key,
 			Nodeselectoroperator: string(requirement.Operator()),
 			Values:               requirement.Values(),
+			Minvalues: func() *int64 {
+				if requirement.MinValues == nil {
+					return nil
+				}
+				v := int64(*requirement.MinValues)
+				return &v
+			}(),
 		})
 	}
 	return requirementsData
@@ -510,9 +461,18 @@ func protoRequirements(requirements scheduling.Requirements) []*pb.InstanceType_
 func reconstructRequirements(requirementsData []*pb.InstanceType_Requirement) scheduling.Requirements {
 	requirements := scheduling.Requirements{}
 	for _, requirementData := range requirementsData {
-		requirements.Add(scheduling.NewRequirement(
+		minValues := func() *int {
+			if requirementData.Minvalues == nil {
+				return nil
+			}
+			v := int(*requirementData.Minvalues)
+			return &v
+		}()
+
+		requirements.Add(scheduling.NewRequirementWithFlexibility(
 			requirementData.Key,
 			v1.NodeSelectorOperator(requirementData.Nodeselectoroperator),
+			minValues,
 			requirementData.Values...,
 		))
 	}
