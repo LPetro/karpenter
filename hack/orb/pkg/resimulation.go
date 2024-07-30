@@ -42,9 +42,6 @@ import (
 // Resimulate from this scheduling input
 func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlFilepath string) (scheduler.Results, error) {
 	ctx := context.Background()
-	// clock := op.Clock
-	// kubeClient := op.GetClient() // ??
-	// cluster := state.NewCluster(clock, kubeClient)
 
 	nodePool, err := unmarshalNodePoolFromUser(nodepoolYamlFilepath)
 	if err != nil {
@@ -52,30 +49,26 @@ func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, nodepoolYamlF
 		return scheduler.Results{}, err
 	}
 
+	// TODO: unmarshal directly into a NodePoolList
 	nodePools := []*v1beta1.NodePool{nodePool}
 
 	// Reconstruct the dynamic fields from my logged inputs
-	// TODO: Currently this is via the saved .log files, not directly from a provided PV
+	// TODO?: Currently this is via the saved .log files, not directly from a provided PV, maybe that's ok
 	stateNodes := getStateNodesFromSchedulingInput(reconstructedSchedulingInput)
 	instanceTypes := getInstanceTypesFromSchedulingInput(reconstructedSchedulingInput)
-	pods := reconstructedSchedulingInput.PendingPods
+	pendingPods := reconstructedSchedulingInput.PendingPods
 	topology := reconstructedSchedulingInput.Topology
 	daemonSetPods := reconstructedSchedulingInput.DaemonSetPods
 	pvList := reconstructedSchedulingInput.PVList
 	pvcList := reconstructedSchedulingInput.PVCList
+	allPods := reconstructedSchedulingInput.ScheduledPodList
 
 	dataClient := New(pvList, pvcList)
 	cluster := state.NewCluster(clock.RealClock{}, dataClient)
+	cluster.ReconstructCluster(ctx, reconstructedSchedulingInput.Bindings, stateNodes, daemonSetPods, allPods)
 
-	// How do I put bindings back into cluster? I just made this
-	// TODO: Check if this even works the way I want it to.
-	cluster.ReconstructCluster(ctx, reconstructedSchedulingInput.Bindings, stateNodes, daemonSetPods)
-
-	// TODO: Figure out why this makes Karpenter call the command-line arguments I've passed in; try to clear them or get around this
-	s := scheduler.NewScheduler(dataClient, nodePools, cluster, stateNodes, topology, instanceTypes, daemonSetPods, nil)
-	return s.Solve(ctx, pods), nil
-	// fmt.Println("Resimulating from this scheduling input:", reconstructedSchedulingInput) // Delete
-	// return scheduler.Results{}, nil
+	s := scheduler.NewScheduler(dataClient, nodePools, cluster, cluster.Nodes(), topology, instanceTypes, daemonSetPods, nil)
+	return s.Solve(ctx, pendingPods), nil
 }
 
 // TODO: Functionality not yet tested, needs to return []*NodePool

@@ -598,21 +598,20 @@ func (c *Cluster) GetBindings() map[types.NamespacedName]string {
 	return bindings
 }
 
-// For ORB Logs, reconstructs bindings, nodes, daemonsetpods and maps from nodename to providerID and nodeclaim name to providerID
-func (c *Cluster) ReconstructCluster(ctx context.Context, bindings map[types.NamespacedName]string, stateNodes []*StateNode, daemonSetPods []*v1.Pod, pendingPods []*v1.Pod) {
+// For ORB Logs, hydrates the cluster with the data from the ORB logs
+func (c *Cluster) ReconstructCluster(ctx context.Context, bindings map[types.NamespacedName]string, stateNodes []*StateNode, daemonSetPods []*v1.Pod, allPods *v1.PodList) {
 	// Set Bindings
 	c.bindings = bindings
 
-	// // Set Nodes and mappings to providerID
-	// for _, statenode := range stateNodes {
-	// 	c.nodeNameToProviderID[statenode.Node.Name] = statenode.Node.Spec.ProviderID
-	// 	c.nodeClaimNameToProviderID[statenode.NodeClaim.Name] = statenode.NodeClaim.Status.ProviderID
-	// 	c.nodes[statenode.NodeClaim.Status.ProviderID] = statenode
-	// }
-
+	// Hydrate StateNodes
 	for _, statenode := range stateNodes {
 		c.UpdateNode(ctx, statenode.Node)
 		c.UpdateNodeClaim(statenode.NodeClaim)
+	}
+
+	// Hydrate all pods
+	for _, pod := range allPods.Items {
+		c.UpdatePod(ctx, &pod)
 	}
 
 	// Set DaemonSetPods

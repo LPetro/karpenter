@@ -639,7 +639,7 @@ func diffInstanceTypes(oldTypes, newTypes []*cloudprovider.InstanceType) Instanc
 		diff.Removed = append(diff.Removed, oldTypeMap[removedName])
 	}
 	for commonName := range newTypeSet.Intersection(oldTypeSet) {
-		if hasReducedInstanceTypeChanged(oldTypeMap[commonName], newTypeMap[commonName]) {
+		if hasInstanceTypeChanged(oldTypeMap[commonName], newTypeMap[commonName]) {
 			diff.Changed = append(diff.Changed, newTypeMap[commonName])
 		}
 	}
@@ -758,7 +758,7 @@ func diffScheduledPods(oldScheduledPods, newScheduledPods *v1.PodList) Scheduled
 	return diff
 }
 
-// Helper functions
+// Helper equality functions
 
 func hasReducedPodChanged(oldPod, newPod *v1.Pod) bool {
 	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta, newPod.ObjectMeta) ||
@@ -770,10 +770,12 @@ func hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods *Sta
 	return !equality.Semantic.DeepEqual(oldStateNodeWithPods, newStateNodeWithPods)
 }
 
-func hasReducedInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
+func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
 	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name) ||
 		!structEqualJSON(oldInstanceType.Offerings, newInstanceType.Offerings) || // Cannot deep equal these, they have unexported types
-		!structEqualJSON(oldInstanceType.Requirements, newInstanceType.Requirements) // ^
+		!structEqualJSON(oldInstanceType.Requirements, newInstanceType.Requirements) ||
+		!structEqualJSON(oldInstanceType.Capacity, newInstanceType.Capacity) ||
+		!structEqualJSON(oldInstanceType.Overhead, newInstanceType.Overhead)
 }
 
 // TODO: Likely inefficient equality checking for nested types Offerings and Requirements,

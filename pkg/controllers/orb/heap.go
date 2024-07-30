@@ -115,7 +115,7 @@ func (h *SchedulingMetadataHeap) LogSchedulingAction(ctx context.Context, schedu
 		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", schedulingTime)
 		metadata, _ = GetSchedulingMetadata(ctx) // Get it again to update metadata
 	}
-	h.Push(metadata)
+	heap.Push(h, metadata)
 }
 
 func protoSchedulingMetadataMap(heap *SchedulingMetadataHeap) *pb.SchedulingMetadataMap {

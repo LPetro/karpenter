@@ -18,6 +18,7 @@ package main
 
 import (
 	"container/heap"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -29,11 +30,14 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	v1 "k8s.io/api/core/v1"
 
 	_ "knative.dev/pkg/system/testing"
 	"sigs.k8s.io/karpenter/hack/orb/pkg"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
+	"sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -52,6 +56,16 @@ type SchedulingMetadataOption struct {
 
 func (o *SchedulingMetadataOption) String() string {
 	return fmt.Sprintf("%d. %s (%s)", o.ID, o.Action, o.Timestamp.Format("2006-01-02_15-04-05"))
+}
+
+type PodErrors map[*v1.Pod]error
+
+func (pe *PodErrors) String() string {
+	var sb strings.Builder
+	for pod, err := range *pe {
+		sb.WriteString(fmt.Sprintf("%s: %s\n", pod.GetName(), err.Error()))
+	}
+	return sb.String()
 }
 
 // Parse the command line arguments
@@ -75,7 +89,8 @@ func main() {
 		fmt.Println("Error reconstructing scheduling input:", err)
 		return
 	}
-	writeReconstructionToJSON(reconstructedSchedulingInput)
+	writeReconstruction(reconstructedSchedulingInput, "json")
+	writeReconstruction(reconstructedSchedulingInput, "yaml")
 
 	/* (Above) Original Scope: Log trace information important to Provisioning and Disruption as a start for troubleshooting */
 	/* ----------------------- */
@@ -86,9 +101,9 @@ func main() {
 		fmt.Println("Error resimulating:", err)
 		return
 	}
-	fmt.Println("Results are:", results)
 
-	// TODO: Compare these results with the original results' set of nodeclaims / nodeclaim returned from EC2Fleet...
+	// Print Results
+	printResults(results, selectedOption.Timestamp)
 }
 
 // Read all metadata log files and extract available options
@@ -146,15 +161,15 @@ func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadat
 		fmt.Println(option.String())
 	}
 
-	fmt.Print("Enter the option number: ")
+	// fmt.Print("Enter the option number: ")
 	// input, _ := reader.ReadString('\n')
 	// input = strings.TrimSpace(input)
 	// choice, err := strconv.Atoi(input)
-	choice := 0
 	// if err != nil || choice < 0 || choice >= len(options) {
 	// 	fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
 	// 	return promptUserForOption(options)
 	// }
+	choice := 0
 	return options[choice]
 }
 
@@ -314,8 +329,24 @@ func GetDifferencesFromBaseline(reconstructTime time.Time, baselineTime time.Tim
 	return differenceFilesFromBaseline
 }
 
-func writeReconstructionToJSON(schedulingInput *orb.SchedulingInput) error {
-	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.json", schedulingInput.Timestamp.Format("2006-01-02_15-04-05"))
+func writeReconstruction(schedulingInput *orb.SchedulingInput, format string) error {
+	reconstructedFilename := fmt.Sprintf("ReconstructedSchedulingInput_%s.%s", schedulingInput.Timestamp.Format("2006-01-02_15-04-05"), format)
+	var data []byte
+	var err error
+
+	switch format {
+	case "json":
+		data = []byte(schedulingInput.Json())
+	case "yaml":
+		data, err = yaml.Marshal(schedulingInput)
+		if err != nil {
+			fmt.Println("Error marshaling scheduling input to YAML:", err)
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
 	path := filepath.Join(logPath, reconstructedFilename)
 	file, err := os.Create(path)
 	if err != nil {
@@ -324,12 +355,13 @@ func writeReconstructionToJSON(schedulingInput *orb.SchedulingInput) error {
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(schedulingInput.Json())
+	_, err = file.Write(data)
 	if err != nil {
 		fmt.Println("Error writing reconstruction to file:", err)
 		return err
 	}
-	fmt.Println("Reconstruction written to file successfully!")
+
+	fmt.Printf("Reconstruction written to %s file successfully!\n", format)
 	return nil
 }
 
@@ -378,4 +410,60 @@ func sanitizePath(path string) string {
 	path = strings.ReplaceAll(path, "../", "")
 
 	return path
+}
+
+// Defined on aliased type to allow YAML output
+func (pe PodErrors) MarshalJSON() ([]byte, error) {
+	// Convert the map to a list of structs for serialization
+	pairs := []struct {
+		Key   string
+		Value string
+	}{}
+
+	for k, v := range pe {
+		pairs = append(pairs, struct {
+			Key   string
+			Value string
+		}{k.String(), v.Error()})
+	}
+
+	return json.Marshal(pairs)
+}
+
+// Export the results object as a yaml
+func printResults(results scheduling.Results, timestamp time.Time) {
+	podErrors := PodErrors{}
+	for pod, err := range results.PodErrors {
+		podErrors[pod] = err
+	}
+
+	wrapper := struct {
+		NewNodeClaims []*scheduling.NodeClaim
+		ExistingNodes []*scheduling.ExistingNode
+		PodErrors     PodErrors
+	}{
+		NewNodeClaims: results.NewNodeClaims,
+		ExistingNodes: results.ExistingNodes,
+		PodErrors:     podErrors,
+	}
+
+	yamlData, err := yaml.Marshal(wrapper)
+	if err != nil {
+		fmt.Println("Error converting results to yaml:", err)
+		return
+	}
+
+	resultsPath := filepath.Join(logPath, fmt.Sprintf("ResimulatedResults_%s.yaml", timestamp.Format("2006-01-02_15-04-05")))
+	yamlFile, err := os.Create(resultsPath)
+	if err != nil {
+		fmt.Println("Error creating results.yaml file:", err)
+		return
+	}
+	_, err = yamlFile.Write(yamlData)
+	if err != nil {
+		fmt.Println("Error writing results to file:", err)
+		return
+	}
+	fmt.Println("Results written to yaml file successfully!")
+
 }

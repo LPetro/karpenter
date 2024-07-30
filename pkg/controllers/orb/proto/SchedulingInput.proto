@@ -19,7 +19,7 @@ message SchedulingInput {
   repeated ReducedPod pendingpod_data = 2;
   repeated StateNodeWithPods statenodes_data = 3;
   Bindings bindings_data = 4;
-  repeated ReducedInstanceType instancetypes_data = 5;
+  repeated InstanceType instancetypes_data = 5;
   NodePoolsToInstanceTypes nodepoolstoinstancetypes_data = 6;
   optional bytes topology_data = 7;
   optional bytes daemonsetpods_data = 8;
@@ -50,21 +50,45 @@ message StateNodeWithPods {
   repeated ReducedPod pods = 3;
 }
 
-message ReducedInstanceType {
+message InstanceType {
   string name = 1;
-  repeated ReducedRequirement requirements = 2;
-  repeated ReducedOffering offerings = 3;
+  repeated Requirement requirements = 2;
+  repeated Offering offerings = 3;
+  ResourceList capacity = 4;
+  Overhead overhead = 5;
 
-  message ReducedRequirement {
+  message Requirement {
     string key = 1;
     string nodeselectoroperator = 2;
     repeated string values = 3;
   }
   
-  message ReducedOffering {
-    repeated ReducedRequirement requirements = 1;
+  message Offering {
+    repeated Requirement requirements = 1;
     double price = 2;
     bool available = 3;
+  }
+
+  message ResourceList {
+    repeated ResourceQuantity resources = 1;
+  }
+
+  message Overhead {
+    ResourceList kubereserved = 1;
+    ResourceList systemreserved = 2;
+    ResourceList evictionthreshold = 3;
+  }
+
+  message ResourceQuantity {
+    string resource_name = 1;
+    bytes quantity = 2;
+  }
+
+  message Quantity {
+    oneof value {
+      int64 i = 1; // for int64 scaled form
+      string d = 2; // for inf.Dec form
+    }
   }
 }
 

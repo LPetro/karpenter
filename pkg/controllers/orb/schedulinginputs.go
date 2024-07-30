@@ -25,6 +25,7 @@ import (
 	proto "google.golang.org/protobuf/proto"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -149,7 +150,7 @@ func (snp StateNodeWithPods) GetName() string {
 
 func (si *SchedulingInput) Reduce() {
 	si.PendingPods = ReducePods(si.PendingPods)
-	si.AllInstanceTypes = ReduceInstanceTypes(si.AllInstanceTypes)
+	// si.AllInstanceTypes = ReduceInstanceTypes(si.AllInstanceTypes)
 }
 
 func (si SchedulingInput) String() string {
@@ -263,44 +264,44 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	return reducedStateNodes
 }
 
-func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings {
-	strippedOfferings := cloudprovider.Offerings{}
-	for _, offering := range offerings {
-		strippedOffering := &cloudprovider.Offering{
-			Requirements: reduceRequirements(offering.Requirements),
-			Price:        offering.Price,
-			Available:    offering.Available,
-		}
-		strippedOfferings = append(strippedOfferings, *strippedOffering)
-	}
-	return strippedOfferings
-}
+// func reduceOfferings(offerings cloudprovider.Offerings) cloudprovider.Offerings {
+// 	strippedOfferings := cloudprovider.Offerings{}
+// 	for _, offering := range offerings {
+// 		strippedOffering := &cloudprovider.Offering{
+// 			Requirements: reduceRequirements(offering.Requirements), // TODO: should I be reducing these?
+// 			Price:        offering.Price,
+// 			Available:    offering.Available,
+// 		}
+// 		strippedOfferings = append(strippedOfferings, *strippedOffering)
+// 	}
+// 	return strippedOfferings
+// }
 
-// Reduce Requirements returns Requirements of these keys: karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
-// TODO Should these keys be called more generically? i.e. via v1beta1.CapacityTypeLabelKey, v1.LabelTopologyZone or something?
-func reduceRequirements(requirements scheduling.Requirements) scheduling.Requirements {
-	reducedRequirements := scheduling.Requirements{}
-	for key, value := range requirements {
-		switch key {
-		case "karpenter.sh/capacity-type", "topology.k8s.aws/zone-id", "topology.kubernetes.io/zone":
-			reducedRequirements[key] = value
-		}
-	}
-	return reducedRequirements
-}
+// // Reduce Requirements returns Requirements of these keys: karpenter.sh/capacity-type, topology.k8s.aws/zone-id and topology.kubernetes.io/zone
+// // TODO Should these keys be called more generically? i.e. via v1beta1.CapacityTypeLabelKey, v1.LabelTopologyZone or something?
+// func reduceRequirements(requirements scheduling.Requirements) scheduling.Requirements {
+// 	reducedRequirements := scheduling.Requirements{}
+// 	for key, value := range requirements {
+// 		switch key {
+// 		case "karpenter.sh/capacity-type", "topology.k8s.aws/zone-id", "topology.kubernetes.io/zone":
+// 			reducedRequirements[key] = value
+// 		}
+// 	}
+// 	return reducedRequirements
+// }
 
-func ReduceInstanceTypes(its []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
-	reducedInstanceTypes := []*cloudprovider.InstanceType{}
-	for _, it := range its {
-		reducedInstanceType := &cloudprovider.InstanceType{
-			Name:         it.Name,
-			Requirements: reduceRequirements(it.Requirements),
-			Offerings:    reduceOfferings(it.Offerings.Available()),
-		}
-		reducedInstanceTypes = append(reducedInstanceTypes, reducedInstanceType)
-	}
-	return reducedInstanceTypes
-}
+// func ReduceInstanceTypes(its []*cloudprovider.InstanceType) []*cloudprovider.InstanceType {
+// 	reducedInstanceTypes := []*cloudprovider.InstanceType{}
+// 	for _, it := range its {
+// 		reducedInstanceType := &cloudprovider.InstanceType{
+// 			Name:         it.Name,
+// 			Requirements: reduceRequirements(it.Requirements),
+// 			Offerings:    reduceOfferings(it.Offerings),
+// 		}
+// 		reducedInstanceTypes = append(reducedInstanceTypes, reducedInstanceType)
+// 	}
+// 	return reducedInstanceTypes
+// }
 
 /* Functions to convert between SchedulingInputs and the proto-defined version
    Via pairs: Marshal <--> Unmarshal and proto <--> reconstruct */
@@ -466,34 +467,38 @@ func reconstructStateNodesWithPods(snpData []*pb.StateNodeWithPods) []*StateNode
 	return stateNodesWithPods
 }
 
-func protoInstanceTypes(instanceTypes []*cloudprovider.InstanceType) []*pb.ReducedInstanceType {
-	itData := []*pb.ReducedInstanceType{}
+func protoInstanceTypes(instanceTypes []*cloudprovider.InstanceType) []*pb.InstanceType {
+	itData := []*pb.InstanceType{}
 	for _, it := range instanceTypes {
-		itData = append(itData, &pb.ReducedInstanceType{
+		itData = append(itData, &pb.InstanceType{
 			Name:         it.Name,
 			Requirements: protoRequirements(it.Requirements),
 			Offerings:    protoOfferings(it.Offerings),
+			Capacity:     protoCapacity(it.Capacity),
+			Overhead:     protoOverhead(it.Overhead),
 		})
 	}
 	return itData
 }
 
-func reconstructInstanceTypes(itData []*pb.ReducedInstanceType) []*cloudprovider.InstanceType {
+func reconstructInstanceTypes(itData []*pb.InstanceType) []*cloudprovider.InstanceType {
 	instanceTypes := []*cloudprovider.InstanceType{}
 	for _, it := range itData {
 		instanceTypes = append(instanceTypes, &cloudprovider.InstanceType{
 			Name:         it.Name,
 			Requirements: reconstructRequirements(it.Requirements),
 			Offerings:    reconstructOfferings(it.Offerings),
+			Capacity:     reconstructResourceList(it.Capacity),
+			Overhead:     reconstructOverhead(it.Overhead),
 		})
 	}
 	return instanceTypes
 }
 
-func protoRequirements(requirements scheduling.Requirements) []*pb.ReducedInstanceType_ReducedRequirement {
-	requirementsData := []*pb.ReducedInstanceType_ReducedRequirement{}
+func protoRequirements(requirements scheduling.Requirements) []*pb.InstanceType_Requirement {
+	requirementsData := []*pb.InstanceType_Requirement{}
 	for _, requirement := range requirements {
-		requirementsData = append(requirementsData, &pb.ReducedInstanceType_ReducedRequirement{
+		requirementsData = append(requirementsData, &pb.InstanceType_Requirement{
 			Key:                  requirement.Key,
 			Nodeselectoroperator: string(requirement.Operator()),
 			Values:               requirement.Values(),
@@ -502,7 +507,7 @@ func protoRequirements(requirements scheduling.Requirements) []*pb.ReducedInstan
 	return requirementsData
 }
 
-func reconstructRequirements(requirementsData []*pb.ReducedInstanceType_ReducedRequirement) scheduling.Requirements {
+func reconstructRequirements(requirementsData []*pb.InstanceType_Requirement) scheduling.Requirements {
 	requirements := scheduling.Requirements{}
 	for _, requirementData := range requirementsData {
 		requirements.Add(scheduling.NewRequirement(
@@ -514,10 +519,10 @@ func reconstructRequirements(requirementsData []*pb.ReducedInstanceType_ReducedR
 	return requirements
 }
 
-func protoOfferings(offerings cloudprovider.Offerings) []*pb.ReducedInstanceType_ReducedOffering {
-	offeringsData := []*pb.ReducedInstanceType_ReducedOffering{}
+func protoOfferings(offerings cloudprovider.Offerings) []*pb.InstanceType_Offering {
+	offeringsData := []*pb.InstanceType_Offering{}
 	for _, offering := range offerings {
-		offeringsData = append(offeringsData, &pb.ReducedInstanceType_ReducedOffering{
+		offeringsData = append(offeringsData, &pb.InstanceType_Offering{
 			Requirements: protoRequirements(offering.Requirements),
 			Price:        offering.Price,
 			Available:    offering.Available,
@@ -526,7 +531,7 @@ func protoOfferings(offerings cloudprovider.Offerings) []*pb.ReducedInstanceType
 	return offeringsData
 }
 
-func reconstructOfferings(offeringsData []*pb.ReducedInstanceType_ReducedOffering) cloudprovider.Offerings {
+func reconstructOfferings(offeringsData []*pb.InstanceType_Offering) cloudprovider.Offerings {
 	offerings := cloudprovider.Offerings{}
 	for _, offeringData := range offeringsData {
 		offerings = append(offerings, cloudprovider.Offering{
@@ -536,6 +541,52 @@ func reconstructOfferings(offeringsData []*pb.ReducedInstanceType_ReducedOfferin
 		})
 	}
 	return offerings
+}
+
+func protoResourceList(resourceList v1.ResourceList) *pb.InstanceType_ResourceList {
+	protoResourceList := &pb.InstanceType_ResourceList{}
+	for resourceName, quantity := range resourceList {
+		protoQuantity, err := quantity.Marshal()
+		if err != nil {
+			fmt.Println("cannot marshal quantity in protoResourceList")
+		}
+
+		protoResourceList.Resources = append(protoResourceList.Resources, &pb.InstanceType_ResourceQuantity{
+			ResourceName: string(resourceName),
+			Quantity:     protoQuantity,
+		})
+	}
+	return protoResourceList
+}
+
+func protoCapacity(capacity v1.ResourceList) *pb.InstanceType_ResourceList {
+	return protoResourceList(capacity)
+}
+
+func reconstructResourceList(protoCapacity *pb.InstanceType_ResourceList) v1.ResourceList {
+	capacity := v1.ResourceList{}
+	for _, resourceQuantity := range protoCapacity.Resources {
+		quantity := &resource.Quantity{}
+		quantity.Unmarshal(resourceQuantity.Quantity)
+		capacity[v1.ResourceName(resourceQuantity.ResourceName)] = *quantity
+	}
+	return capacity
+}
+
+func protoOverhead(overhead *cloudprovider.InstanceTypeOverhead) *pb.InstanceType_Overhead {
+	return &pb.InstanceType_Overhead{
+		Kubereserved:      protoResourceList(overhead.KubeReserved),
+		Systemreserved:    protoResourceList(overhead.SystemReserved),
+		Evictionthreshold: protoResourceList(overhead.EvictionThreshold),
+	}
+}
+
+func reconstructOverhead(protoOverhead *pb.InstanceType_Overhead) *cloudprovider.InstanceTypeOverhead {
+	return &cloudprovider.InstanceTypeOverhead{
+		KubeReserved:      reconstructResourceList(protoOverhead.Kubereserved),
+		SystemReserved:    reconstructResourceList(protoOverhead.Systemreserved),
+		EvictionThreshold: reconstructResourceList(protoOverhead.Evictionthreshold),
+	}
 }
 
 func protoBindings(bindings map[types.NamespacedName]string) *pb.Bindings {
