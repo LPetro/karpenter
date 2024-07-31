@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"container/heap"
 	"encoding/json"
 	"flag"
@@ -104,18 +105,21 @@ func init() {
 		v1prov.LabelTopologyZoneID,
 		v1.LabelWindowsBuild,
 	)
-
 }
 
 // This conducts ORB Reconstruction from the command-line.
 func main() {
-	options, err := readMetadataLogs()
+	startread := time.Now()
+	options, err := getMetadataOptionsFromLogs()
 	if err != nil {
 		fmt.Println("Error reading metadata logs:", err)
 		return
 	}
+	elapsedread := time.Since(startread)
+	fmt.Println("Time to read metadata logs:", elapsedread)
+
 	selectedOption := promptUserForOption(options)
-	fmt.Printf("Pulling option: %s from this directory: %s\n", selectedOption, logPath) // Delete later
+	fmt.Printf("\nSelected option: '%s'\n", selectedOption) // Delete later
 	reconstructedSchedulingInput, err := reconstructFromOption(selectedOption.Timestamp)
 	if err != nil {
 		fmt.Println("Error reconstructing scheduling input:", err)
@@ -128,55 +132,55 @@ func main() {
 	/* ----------------------- */
 	/* (Below) Stretch Goal:   Have the tool resimulate and compare to the original results */
 
-	results, err := pkg.Resimulate(reconstructedSchedulingInput, nodepoolsYamlFilepath)
+	nodePools, err := unmarshalNodePoolsFromUser(nodepoolsYamlFilepath)
+	if err != nil {
+		fmt.Println("Error unmarshalling node pools:", err)
+		return
+	}
+
+	results, err := pkg.Resimulate(reconstructedSchedulingInput, nodePools)
 	if err != nil {
 		fmt.Println("Error resimulating:", err)
 		return
 	}
 
 	// Print Results
-	printResults(results, selectedOption.Timestamp)
+	printResults(results, selectedOption.Timestamp, nodePools)
 }
 
-// Read all metadata log files and extract available options
-func readMetadataLogs() ([]*SchedulingMetadataOption, error) {
-	// Get all filenames starting with "SchedulingMetadata" within the dirPath provided
+// Read all metadata log files in the directory and extract available options of scheduling actions
+func getMetadataOptionsFromLogs() ([]*SchedulingMetadataOption, error) {
 	files, err := os.ReadDir(logPath)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
 		return nil, err
 	}
-	// Filter out files that don't start with "SchedulingMetadata"
-	var metadataFiles []string
-	regex := regexp.MustCompile(`^SchedulingMetadata.*\.log$`)
-	// Iterate through the files and add matching filenames to the metadataFiles slice
-	for _, file := range files {
-		if regex.MatchString(file.Name()) {
-			metadataFiles = append(metadataFiles, file.Name())
-		}
-	}
 
-	// For each metadataFile, read its contents, deserialize from protobuf and save into it's orb.Metadata structure
-	// Then, extract the options from the Metadata structure and return them as a slice of strings
+	// For each file starting with "SchedulingMetadata", read its contents, deserialize from protobuf and
+	// save into it's orb.Metadata structure. Then extracts and sorts each file's metadata and returns their options
+	regex := regexp.MustCompile(`^SchedulingMetadata.*\.log$`)
 	options := []*SchedulingMetadataOption{}
 	allMetadata := orb.NewSchedulingMetadataHeap()
-	for _, metadataFile := range metadataFiles {
-		contents, err := ReadLog(metadataFile)
+	for _, file := range files {
+		if !regex.MatchString(file.Name()) {
+			continue
+		}
+
+		contents, err := ReadLog(file.Name())
 		if err != nil {
 			fmt.Println("Error reading file contents:", err)
 			return nil, err
 		}
 
-		// Unmarshal the metadataLogdata back into the metadatamap
+		// Unmarshal the metadataLogdata back into []metadata
 		protoMetadataMap := &pb.SchedulingMetadataMap{}
 		proto.Unmarshal(contents, protoMetadataMap)
-		metadataHeap := orb.ReconstructSchedulingMetadataHeap(protoMetadataMap)
+		metadataSlice := orb.ReconstructAllSchedulingMetadata(protoMetadataMap)
 
-		// While metadataHeap isn't empty, pop off each metadata, and save the Action and timestamp to a string option line with a newline at the end
-		// Then, append that option to the options slice
-		for metadataHeap.Len() > 0 {
-			// Recombine/order all metadata from multiple files
-			heap.Push(allMetadata, heap.Pop(metadataHeap).(orb.SchedulingMetadata))
+		for _, metadatum := range metadataSlice {
+			if metadatum != nil {
+				heap.Push(allMetadata, *metadatum)
+			}
 		}
 	}
 
@@ -184,25 +188,27 @@ func readMetadataLogs() ([]*SchedulingMetadataOption, error) {
 		metadata := heap.Pop(allMetadata).(orb.SchedulingMetadata)
 		options = append(options, &SchedulingMetadataOption{ID: len(options), Action: metadata.Action, Timestamp: metadata.Timestamp})
 	}
+
 	return options, nil
 }
 
 func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadataOption {
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Available options:")
 	for _, option := range options {
 		fmt.Println(option.String())
 	}
 
 	fmt.Print("Enter the option number: ")
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	choice, err := strconv.Atoi(input)
+	input, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		fmt.Println("Error reading input:", err)
+		return promptUserForOption(options)
+	}
+	choice, err := strconv.Atoi(strings.TrimSpace(input))
 	if err != nil || choice < 0 || choice >= len(options) {
 		fmt.Printf("Invalid input \"%s\". Please enter a number between 0 and %d.\n", input, len(options)-1)
 		return promptUserForOption(options)
 	}
-	// choice := 0
 	return options[choice]
 }
 
@@ -432,6 +438,38 @@ func ReconstructDifferences(fileNames []string) ([]*orb.SchedulingInputDifferenc
 	return allDifferences, nil
 }
 
+// Reads in a NodePools.yaml file and unmarshals into a NodePool slice
+func unmarshalNodePoolsFromUser(nodepoolYamlFilepath string) ([]*v1beta1.NodePool, error) {
+	yamlFile, err := os.Open(nodepoolYamlFilepath)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+	defer yamlFile.Close()
+
+	yamlData, err := io.ReadAll(yamlFile)
+	if err != nil {
+		fmt.Println("Error reading yaml file:", err)
+		return nil, err
+	}
+
+	nodePools := []*v1beta1.NodePool{}
+	nodepoolsbytes := bytes.Split(yamlData, []byte("\n---\n"))
+	for _, nodepoolbytes := range nodepoolsbytes {
+		if len(bytes.TrimSpace(nodepoolbytes)) == 0 {
+			continue
+		}
+		nodePool := &v1beta1.NodePool{}
+		err = yaml.Unmarshal(nodepoolbytes, nodePool)
+		if err != nil {
+			return nil, err
+		}
+		nodePools = append(nodePools, nodePool)
+	}
+
+	return nodePools, nil
+}
+
 // Security Issue Common Weakness Enumeration (CWE)-22,23 Path Traversal
 // They highly recommend sanitizing inputs before accessing that path.
 func sanitizePath(path string) string {
@@ -464,18 +502,32 @@ func (pe PodErrors) MarshalJSON() ([]byte, error) {
 }
 
 // Export the results object as a yaml
-func printResults(results scheduling.Results, timestamp time.Time) {
+func printResults(results scheduling.Results, timestamp time.Time, nodePools []*v1beta1.NodePool) {
 	podErrors := PodErrors{}
 	for pod, err := range results.PodErrors {
 		podErrors[pod] = err
 	}
 
+	// Make a map from nodepoolname to nodepool
+	nodePoolMap := map[string]*v1beta1.NodePool{}
+	for _, nodePool := range nodePools {
+		nodePoolMap[nodePool.Name] = nodePool
+	}
+
+	// Define an alias for the slice of NodeClaim, do the ToNodeClaim
+	nodeClaims := []*v1beta1.NodeClaim{}
+	for i := range results.NewNodeClaims {
+		// Get nodepool from nodeclaim's nodepoolname
+		nodePool := nodePoolMap[results.NewNodeClaims[i].NodePoolName]
+		nodeClaims = append(nodeClaims, results.NewNodeClaims[i].ToNodeClaim(nodePool))
+	}
+
 	wrapper := struct {
-		NewNodeClaims []*scheduling.NodeClaim
+		NewNodeClaims []*v1beta1.NodeClaim
 		ExistingNodes []*scheduling.ExistingNode
 		PodErrors     PodErrors
 	}{
-		NewNodeClaims: results.NewNodeClaims,
+		NewNodeClaims: nodeClaims,
 		ExistingNodes: results.ExistingNodes,
 		PodErrors:     podErrors,
 	}

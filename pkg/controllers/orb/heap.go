@@ -128,11 +128,12 @@ func protoSchedulingMetadataMap(heap *SchedulingMetadataHeap) *pb.SchedulingMeta
 	return mapping
 }
 
-func ReconstructSchedulingMetadataHeap(mapping *pb.SchedulingMetadataMap) *SchedulingMetadataHeap {
-	heap := NewSchedulingMetadataHeap()
+// Since each file will be heapified in aggregate, we don't need to reconstruct as a heap.
+func ReconstructAllSchedulingMetadata(mapping *pb.SchedulingMetadataMap) []*SchedulingMetadata {
+	metadata := []*SchedulingMetadata{}
 	for _, entry := range mapping.Entries {
-		metadata := reconstructSchedulingMetadata(entry)
-		heap.Push(metadata)
+		metadatum := reconstructSchedulingMetadata(entry)
+		metadata = append(metadata, &metadatum)
 	}
-	return heap
+	return metadata
 }
