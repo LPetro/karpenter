@@ -64,6 +64,7 @@ func (o *SchedulingMetadataOption) String() string {
 	return fmt.Sprintf("%d. %s (%s)", o.ID, o.Action, o.Timestamp.Format("2006-01-02_15-04-05"))
 }
 
+// Alias to define JSON marshaling for YAML output
 type PodErrors map[*v1.Pod]error
 
 func (pe *PodErrors) String() string {
@@ -109,14 +110,11 @@ func init() {
 
 // This conducts ORB Reconstruction from the command-line.
 func main() {
-	startread := time.Now()
 	options, err := getMetadataOptionsFromLogs()
 	if err != nil {
 		fmt.Println("Error reading metadata logs:", err)
 		return
 	}
-	elapsedread := time.Since(startread)
-	fmt.Println("Time to read metadata logs:", elapsedread)
 
 	selectedOption := promptUserForOption(options)
 	fmt.Printf("\nSelected option: '%s'\n", selectedOption) // Delete later
@@ -144,7 +142,6 @@ func main() {
 		return
 	}
 
-	// Print Results
 	printResults(results, selectedOption.Timestamp, nodePools)
 }
 
@@ -497,7 +494,6 @@ func (pe PodErrors) MarshalJSON() ([]byte, error) {
 			Value string
 		}{k.String(), v.Error()})
 	}
-
 	return json.Marshal(pairs)
 }
 
@@ -514,10 +510,10 @@ func printResults(results scheduling.Results, timestamp time.Time, nodePools []*
 		nodePoolMap[nodePool.Name] = nodePool
 	}
 
+	// TODO: Match logic from CreateNodeClaims
 	// Define an alias for the slice of NodeClaim, do the ToNodeClaim
 	nodeClaims := []*v1beta1.NodeClaim{}
 	for i := range results.NewNodeClaims {
-		// Get nodepool from nodeclaim's nodepoolname
 		nodePool := nodePoolMap[results.NewNodeClaims[i].NodePoolName]
 		nodeClaims = append(nodeClaims, results.NewNodeClaims[i].ToNodeClaim(nodePool))
 	}

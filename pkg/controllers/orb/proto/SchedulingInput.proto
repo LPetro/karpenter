@@ -27,7 +27,8 @@ message ReducedPod {
   string namespace = 2;
   string uid = 3;
   string phase = 4;
-  repeated PodCondition conditions = 5;
+  bytes spec = 5;
+  repeated PodCondition conditions = 6;
 
   message PodCondition {
     string type = 1;

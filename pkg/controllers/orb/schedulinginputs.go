@@ -207,6 +207,7 @@ func ReducePods(pods []*v1.Pod) []*v1.Pod {
 				Namespace: pod.Namespace,
 				UID:       pod.GetUID(),
 			},
+			Spec: pod.Spec,
 			Status: v1.PodStatus{
 				Phase:      pod.Status.Phase,
 				Conditions: reducePodConditions(pod.Status.Conditions),
@@ -308,11 +309,17 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 func protoPods(pods []*v1.Pod) []*pb.ReducedPod {
 	reducedPods := []*pb.ReducedPod{}
 	for _, pod := range pods {
+		podSpecData, err := pod.Spec.Marshal()
+		if err != nil {
+			fmt.Println("Failed to marshal pod spec: ", err)
+			return nil
+		}
 		reducedPod := &pb.ReducedPod{
 			Name:       pod.Name,
 			Namespace:  pod.Namespace,
 			Uid:        string(pod.GetUID()),
 			Phase:      string(pod.Status.Phase),
+			Spec:       podSpecData,
 			Conditions: protoPodConditions(pod.Status.Conditions),
 		}
 		reducedPods = append(reducedPods, reducedPod)
@@ -329,10 +336,16 @@ func reconstructPods(reducedPods []*pb.ReducedPod) []*v1.Pod {
 				Namespace: reducedPod.Namespace,
 				UID:       types.UID(reducedPod.Uid),
 			},
+			Spec: v1.PodSpec{},
 			Status: v1.PodStatus{
 				Phase:      v1.PodPhase(reducedPod.Phase),
 				Conditions: reconstructPodConditions(reducedPod.Conditions),
 			},
+		}
+		err := pod.Spec.Unmarshal(reducedPod.Spec)
+		if err != nil {
+			fmt.Println("Failed to unmarshal pod spec: ", err)
+			return nil
 		}
 		pods = append(pods, pod)
 	}
