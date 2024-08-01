@@ -34,13 +34,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const ( // Constants for calculating the moving average of the rebaseline
+const (
+	pvMountPath = "/data" // As defined in our PVC yaml
+
+	// Constants for calculating the moving average of the rebaseline
 	initialDeltaThreshold = 0.50
 	decayFactor           = 0.9
 	updateFactor          = 0.1
 	thresholdMultiplier   = 1.2
 	minThreshold          = 0.1
-) // mountPath = "/data" // Worth including? As defined in our PVC yaml
+)
 
 type Controller struct {
 	schedulingInputHeap    *SchedulingInputHeap    // Batches logs of inputs to heap
@@ -137,7 +140,7 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 
 	timestampStr := item.Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
-	path := filepath.Join("/data", fileName)
+	path := filepath.Join(pvMountPath, fileName)
 
 	fmt.Println("Writing baseline data to S3 bucket.") // test print / remove later
 	return c.writeToPV(logdata, path)
@@ -150,7 +153,7 @@ func (c *Controller) logBatchedSchedulingDifferencesToPV(batchedDifferences []*S
 
 	start, end := GetTimeWindow(batchedDifferences)
 	fileName := fmt.Sprintf("SchedulingInputDifferences_%s_%s.log", start.Format("2006-01-02_15-04-05"), end.Format("2006-01-02_15-04-05"))
-	path := filepath.Join("/data", fileName)
+	path := filepath.Join(pvMountPath, fileName)
 
 	logdata, err := MarshalBatchedDifferences(batchedDifferences)
 	if err != nil {
@@ -171,7 +174,7 @@ func (c *Controller) logSchedulingMetadataToPV(heap *SchedulingMetadataHeap) err
 	oldestStr := (*heap)[0].Timestamp.Format("2006-01-02_15-04-05")
 	newestStr := (*heap)[len(*heap)-1].Timestamp.Format("2006-01-02_15-04-05")
 	fileName := fmt.Sprintf("SchedulingMetadata_%s_to_%s.log", oldestStr, newestStr)
-	path := filepath.Join("/data", fileName)
+	path := filepath.Join(pvMountPath, fileName)
 
 	// Marshals the mapping
 	mappingdata, err := proto.Marshal(protoSchedulingMetadataMap(heap))

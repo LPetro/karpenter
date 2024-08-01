@@ -77,8 +77,8 @@ var cloudProvider *fake.CloudProvider
 var nodeStateController *informer.NodeController
 var nodeClaimStateController *informer.NodeClaimController
 var podStateController *informer.PodController
-var SIHeap *orb.SchedulingInputHeap
-var SMHeap *orb.SchedulingMetadataHeap
+var siHeap *orb.SchedulingInputHeap
+var smHeap *orb.SchedulingMetadataHeap
 
 const csiProvider = "fake.csi.provider"
 const isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
@@ -101,8 +101,9 @@ var _ = BeforeSuite(func() {
 	nodeStateController = informer.NewNodeController(env.Client, cluster)
 	nodeClaimStateController = informer.NewNodeClaimController(env.Client, cluster)
 	podStateController = informer.NewPodController(env.Client, cluster)
-	SIHeap = orb.NewSchedulingInputHeap()
-	prov = provisioning.NewProvisioner(env.Client, events.NewRecorder(&record.FakeRecorder{}), cloudProvider, cluster, SIHeap, SMHeap)
+	siHeap = orb.NewMinHeap[orb.SchedulingInput]()
+	smHeap = orb.NewMinHeap[orb.SchedulingMetadata]()
+	prov = provisioning.NewProvisioner(env.Client, events.NewRecorder(&record.FakeRecorder{}), cloudProvider, cluster, siHeap, smHeap)
 })
 
 var _ = AfterSuite(func() {

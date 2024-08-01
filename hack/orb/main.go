@@ -157,7 +157,7 @@ func getMetadataOptionsFromLogs() ([]*SchedulingMetadataOption, error) {
 	// save into it's orb.Metadata structure. Then extracts and sorts each file's metadata and returns their options
 	regex := regexp.MustCompile(`^SchedulingMetadata.*\.log$`)
 	options := []*SchedulingMetadataOption{}
-	allMetadata := orb.NewSchedulingMetadataHeap()
+	allMetadata := orb.NewMinHeap[orb.SchedulingMetadata]()
 	for _, file := range files {
 		if !regex.MatchString(file.Name()) {
 			continue

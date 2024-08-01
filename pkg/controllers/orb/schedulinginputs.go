@@ -135,6 +135,10 @@ func (si *SchedulingInput) Reduce() {
 	// si.AllInstanceTypes = ReduceInstanceTypes(si.AllInstanceTypes)
 }
 
+func (si SchedulingInput) GetTime() time.Time {
+	return si.Timestamp
+}
+
 func (si SchedulingInput) String() string {
 	return protoSchedulingInput(&si).String()
 }

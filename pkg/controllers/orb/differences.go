@@ -771,12 +771,13 @@ func hasStateNodeWithPodsChanged(oldStateNodeWithPods, newStateNodeWithPods *Sta
 
 func hasInstanceTypeChanged(oldInstanceType, newInstanceType *cloudprovider.InstanceType) bool {
 	return !equality.Semantic.DeepEqual(oldInstanceType.Name, newInstanceType.Name) ||
-		!structEqualJSON(oldInstanceType.Offerings, newInstanceType.Offerings) || // Cannot deep equal these, they have unexported types
+		!structEqualJSON(oldInstanceType.Offerings, newInstanceType.Offerings) ||
 		!structEqualJSON(oldInstanceType.Requirements, newInstanceType.Requirements) ||
 		!structEqualJSON(oldInstanceType.Capacity, newInstanceType.Capacity) ||
 		!structEqualJSON(oldInstanceType.Overhead, newInstanceType.Overhead)
 }
 
+// Used when fields contain unexported types, which would cause DeepEqual to panic.
 // TODO: Likely inefficient equality checking for nested types Offerings and Requirements,
 // but both have unexported types not compatible with DeepEqual
 func structEqualJSON(a, b interface{}) bool {

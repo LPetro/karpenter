@@ -34,6 +34,10 @@ const (
 	schedulingMetadataKey key = iota
 )
 
+func (sm SchedulingMetadata) GetTime() time.Time {
+	return sm.Timestamp
+}
+
 // Returns a new context with the provided scheduling metadata.
 func WithSchedulingMetadata(ctx context.Context, action string, timestamp time.Time) context.Context {
 	switch action {
