@@ -68,39 +68,31 @@ func NewMinHeap[T TimestampedType]() *MinTimeHeap[T] {
 	return h
 }
 
-// SchedulingInputHeap is a min-heap of SchedulingInputs
-type SchedulingInputHeap = MinTimeHeap[SchedulingInput]
+type SchedulingInputHeap = MinTimeHeap[SchedulingInput]       // A min-heap of SchedulingInputs
+type SchedulingMetadataHeap = MinTimeHeap[SchedulingMetadata] // A min-heap of SchedulingMetadata
 
-// Function for logging scheduling inputs to the Provisioner Scheduler. Batches via a min-heap, ordered by least recent.
+// Logs inputs to the Provisioner Scheduler. Batched every ORB Reconcile loop via a min-heap (ordered by least-recent time scheduled).
 func (h *MinTimeHeap[SchedulingInput]) LogSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pods []*v1.Pod, stateNodes []*state.StateNode,
 	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) {
 	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes, topology, daemonSetPods)
-	si.Reduce()
 	heap.Push(h, si)
 }
 
-// SchedulingMetadataHeap is a min-heap of SchedulingMetadata
-type SchedulingMetadataHeap = MinTimeHeap[SchedulingMetadata]
-
-// func NewSchedulingMetadataHeap() *SchedulingMetadataHeap {
-// 	h := &SchedulingMetadataHeap{}
-// 	heap.Init(h)
-// 	return h
-// }
-
+// Logs metadata of the scheduling action taking place in the Provisioner Scheduler. Batched every ORB Reconcile loop via a min-heap (ordered by least-recent time scheduled).
 func (h *MinTimeHeap[SchedulingMetadata]) LogSchedulingAction(ctx context.Context, schedulingTime time.Time) {
 	metadata, ok := GetSchedulingMetadata(ctx)
-	if !ok { // Provisioning metadata is not set in the context, set it to the default - normal provisioning action
+	if !ok { // If metadata is not set in the context--scheduling was not prompted by a Consolidation or Drift--it is a normal provisioning action
 		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", schedulingTime)
-		metadata, _ = GetSchedulingMetadata(ctx) // Get it again to update metadata
+		metadata, _ = GetSchedulingMetadata(ctx) // Update metadata
 	}
-	// This allows us to associate metadata with its respective scheduling action. It resolves the potential time
-	// difference between the start of an action call (consolidation/drift) and its subsequent provisioning scheduling.
+	// Resolve the potential time difference between the start of an action call (consolidation/drift) and its subsequent provisioning scheduling.
+	// This allows us to associate metadata with its respective scheduling action.
 	metadata.Timestamp = schedulingTime
 
 	heap.Push(h, metadata)
 }
 
+// Converts from scheduling metadata's Karpenter representation to protobuf. It is nearly-symmetric to its Reconstruct function
 func protoSchedulingMetadataMap(heap *SchedulingMetadataHeap) *pb.SchedulingMetadataMap {
 	mapping := &pb.SchedulingMetadataMap{}
 	for heap.Len() > 0 {

@@ -36,13 +36,12 @@ import (
 	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/scheduling"
-	"sigs.k8s.io/karpenter/pkg/utils/pretty"
 )
 
-type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshal definition
+type BindingsMap map[types.NamespacedName]string // Alias to allow JSON Marshaling
 
-// These are the inputs to the scheduling function (scheduler.NewSchedule) which we'll serialize and log
-// for later deserialization, reconstruction and resimulation in the ORB Debugging Tool
+// These are the inputs to the Provisioner Scheduling which we'll serialize and log for
+// later deserialization, reconstruction and resimulation in the ORB Debugging Tool
 type SchedulingInput struct {
 	Timestamp             time.Time
 	PendingPods           []*v1.Pod
@@ -57,17 +56,18 @@ type SchedulingInput struct {
 	ScheduledPodList      *v1.PodList
 }
 
-// A stateNode with the Pods it has on it.
+// A stateNode combined with its associated Pods.
 type StateNodeWithPods struct {
 	Node      *v1.Node
 	NodeClaim *v1beta1.NodeClaim
 	Pods      []*v1.Pod
 }
 
-// Construct and reduce the Scheduling Input down to what's minimally required for re-simulation
+// Construct a Scheduling Input and reduce it down to what's minimally required for resimulation
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod, stateNodes []*state.StateNode,
 	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) SchedulingInput {
 	allInstanceTypes, nodePoolInstanceTypes := getAllInstanceTypesAndNodePoolMapping(instanceTypes)
+
 	// Get all PVs and PVCs from kubeClient
 	pvcList := &v1.PersistentVolumeClaimList{}
 	err := kubeClient.List(ctx, pvcList)
@@ -81,8 +81,9 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		fmt.Println("PV List error in Scheduling Input logging: ", err)
 		return SchedulingInput{}
 	}
+
+	// Get all scheduledPods from kubeClient
 	scheduledPodList := &v1.PodList{}
-	// Get all pods from kubeClient
 	err = kubeClient.List(ctx, scheduledPodList)
 	if err != nil {
 		fmt.Println("Pod List error in Scheduling Input logging: ", err)
@@ -91,7 +92,7 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 
 	return SchedulingInput{
 		Timestamp:             scheduledTime,
-		PendingPods:           pendingPods,
+		PendingPods:           reducePods(pendingPods),
 		StateNodesWithPods:    newStateNodesWithPods(ctx, kubeClient, stateNodes),
 		Bindings:              bindings,
 		AllInstanceTypes:      allInstanceTypes,
@@ -104,25 +105,6 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 	}
 }
 
-func NewReconstructedSchedulingInput(timestamp time.Time, pendingPods []*v1.Pod, stateNodesWithPods []*StateNodeWithPods, bindings map[types.NamespacedName]string,
-	instanceTypes []*cloudprovider.InstanceType, nodePoolInstanceTypes map[string][]string, topology *scheduler.Topology, daemonSetPods []*v1.Pod,
-	pvList *v1.PersistentVolumeList, pvcList *v1.PersistentVolumeClaimList, scheduledPodList *v1.PodList) *SchedulingInput {
-	return &SchedulingInput{
-		Timestamp:             timestamp,
-		PendingPods:           pendingPods,
-		StateNodesWithPods:    stateNodesWithPods,
-		Bindings:              bindings,
-		AllInstanceTypes:      instanceTypes,
-		NodePoolInstanceTypes: nodePoolInstanceTypes,
-		Topology:              topology,
-		DaemonSetPods:         daemonSetPods,
-		PVList:                pvList,
-		PVCList:               pvcList,
-		ScheduledPodList:      scheduledPodList,
-	}
-}
-
-// Mirrors StateNode's GetName
 func (snp StateNodeWithPods) GetName() string {
 	if snp.Node == nil {
 		return snp.NodeClaim.GetName()
@@ -130,22 +112,13 @@ func (snp StateNodeWithPods) GetName() string {
 	return snp.Node.GetName()
 }
 
-func (si *SchedulingInput) Reduce() {
-	si.PendingPods = ReducePods(si.PendingPods)
-	// si.AllInstanceTypes = ReduceInstanceTypes(si.AllInstanceTypes)
-}
-
+// Comparator for MinTimeHeap interface
 func (si SchedulingInput) GetTime() time.Time {
 	return si.Timestamp
 }
 
 func (si SchedulingInput) String() string {
 	return protoSchedulingInput(&si).String()
-}
-
-// TODO: I don't think this is marshalling Requirements appropriately. It has Key, but no values. String() gathers that information, so it definitely exists.
-func (si SchedulingInput) Json() string {
-	return pretty.Concise(si)
 }
 
 func (m BindingsMap) MarshalJSON() ([]byte, error) {
@@ -160,9 +133,16 @@ func (si *SchedulingInput) isEmpty() bool {
 	return len(si.PendingPods) == 0 &&
 		len(si.StateNodesWithPods) == 0 &&
 		len(si.Bindings) == 0 &&
-		len(si.AllInstanceTypes) == 0
+		len(si.AllInstanceTypes) == 0 &&
+		len(si.NodePoolInstanceTypes) == 0 &&
+		si.Topology == nil &&
+		len(si.DaemonSetPods) == 0 &&
+		si.PVList == nil &&
+		si.PVCList == nil &&
+		si.ScheduledPodList == nil
 }
 
+// Constructs StateNodesWithPods by reducing the stateNodes to their Node and NodeClaim and getting the Pods associated with them.
 func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateNodes []*state.StateNode) []*StateNodeWithPods {
 	stateNodesWithPods := []*StateNodeWithPods{}
 	for _, stateNode := range reduceStateNodes(stateNodes) {
@@ -170,18 +150,17 @@ func newStateNodesWithPods(ctx context.Context, kubeClient client.Client, stateN
 		if err != nil {
 			pods = nil
 		}
-
 		stateNodesWithPods = append(stateNodesWithPods, &StateNodeWithPods{
 			Node:      stateNode.Node,
 			NodeClaim: stateNode.NodeClaim,
-			Pods:      ReducePods(pods),
+			Pods:      reducePods(pods),
 		})
 	}
 	return stateNodesWithPods
 }
 
-// Gets the superset of all InstanceTypes from the mapping. This is to simplify saving the NodePool -> InstanceType map
-// by allowing us to save all of them by their unique name, and then associating the NodePool name with its corresponding instancetype names
+// Gets the superset of all InstanceTypes from the mapping. This is to simplify saving the NodePool -> InstanceType map.
+// It saves all of them by their unique name, then associats the NodePool name with its corresponding instancetype names
 func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprovider.InstanceType) ([]*cloudprovider.InstanceType, map[string][]string) {
 	allInstanceTypesNameMap := map[string]*cloudprovider.InstanceType{}
 	nodePoolToInstanceTypes := map[string][]string{}
@@ -200,9 +179,7 @@ func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprov
 	return uniqueInstanceTypes, nodePoolToInstanceTypes
 }
 
-/* Functions to reduce resources in Scheduling Inputs to the constituent parts we care to log / introspect */
-
-func ReducePods(pods []*v1.Pod) []*v1.Pod {
+func reducePods(pods []*v1.Pod) []*v1.Pod {
 	reducedPods := []*v1.Pod{}
 	for _, pod := range pods {
 		reducedPod := &v1.Pod{
@@ -245,15 +222,16 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 			reducedStateNode.Node = node.Node
 			reducedStateNode.NodeClaim = node.NodeClaim
 			if reducedStateNode.Node != nil || reducedStateNode.NodeClaim != nil {
-				reducedStateNodes = append(reducedStateNodes, reducedStateNode)
+				reducedStateNodes = append(reducedStateNodes, reducedStateNode) // Guarantees both won't be nil
 			}
 		}
 	}
 	return reducedStateNodes
 }
 
-/* Functions to convert between SchedulingInputs and the proto-defined version
-   Via pairs: Marshal <--> Unmarshal and proto <--> reconstruct */
+// Symmetric functions to convert between SchedulingInputs and their fields to protobuf serialization
+// Marshal <--> Unmarshal, outer layer functions from Karpenter structs to []byte and back
+// proto <--> reconstruct, inner layer functions from Karpenter structs to protobuf struct and back
 
 func MarshalSchedulingInput(si *SchedulingInput) ([]byte, error) {
 	return proto.Marshal(protoSchedulingInput(si))
@@ -261,7 +239,6 @@ func MarshalSchedulingInput(si *SchedulingInput) ([]byte, error) {
 
 func UnmarshalSchedulingInput(schedulingInputData []byte) (*SchedulingInput, error) {
 	entry := &pb.SchedulingInput{}
-
 	if err := proto.Unmarshal(schedulingInputData, entry); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal SchedulingInput: %v", err)
 	}
@@ -295,7 +272,7 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		return nil, fmt.Errorf("failed to parse timestamp: %v", err)
 	}
 
-	return NewReconstructedSchedulingInput(
+	return &SchedulingInput{
 		timestamp,
 		reconstructPods(pbsi.GetPendingpodData()),
 		reconstructStateNodesWithPods(pbsi.GetStatenodesData()),
@@ -307,7 +284,7 @@ func reconstructSchedulingInput(pbsi *pb.SchedulingInput) (*SchedulingInput, err
 		reconstructPVList(pbsi.GetPvlistData()),
 		reconstructPVCList(pbsi.GetPvclistData()),
 		reconstructScheduledPodList(pbsi.GetScheduledpodlistData()),
-	), nil
+	}, nil
 }
 
 func protoPods(pods []*v1.Pod) []*pb.ReducedPod {
@@ -651,7 +628,6 @@ func reconstructDaemonSetPods(dspData []byte) []*v1.Pod {
 	podList.Unmarshal(dspData)
 
 	daemonSetPods := []*v1.Pod{}
-
 	for _, pod := range podList.Items {
 		daemonSetPods = append(daemonSetPods, &pod)
 	}

@@ -608,12 +608,10 @@ func (c *Cluster) ReconstructCluster(ctx context.Context, bindings map[types.Nam
 		c.UpdateNode(ctx, statenode.Node)
 		c.UpdateNodeClaim(statenode.NodeClaim)
 	}
-
 	// Hydrate all pods
 	for _, pod := range allPods.Items {
 		c.UpdatePod(ctx, &pod)
 	}
-
 	// Set DaemonSetPods
 	for _, pod := range daemonSetPods {
 		c.daemonSetPods.Store(client.ObjectKeyFromObject(pod), pod)

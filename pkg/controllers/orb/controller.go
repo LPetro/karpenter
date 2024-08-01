@@ -26,18 +26,20 @@ import (
 	"time"
 
 	"github.com/awslabs/operatorpkg/singleton"
-
+	// Warning: This version of protobuf may get autoimported from go.mod/go.sum definitions.
+	// It is outdated and will cause errors in the (de/)serialization processes
+	//     proto "github.com/gogo/protobuf/proto"
 	"google.golang.org/protobuf/proto"
-	// proto "github.com/gogo/protobuf/proto" // This one is outdated and causes errors in the (de/)serialization processes
+
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
-	pvMountPath = "/data" // As defined in our PVC yaml
+	pvMountPath = "/data" // Matches the directory mounted via the CSI driver in our PV/PVC config yaml
 
-	// Constants for calculating the moving average of the rebaseline
+	// Constants for rebaselining logic, calculating the moving average of differences' sizes compared to baseline size
 	initialDeltaThreshold = 0.50
 	decayFactor           = 0.9
 	updateFactor          = 0.1
@@ -46,14 +48,13 @@ const (
 )
 
 type Controller struct {
-	schedulingInputHeap    *SchedulingInputHeap    // Batches logs of inputs to heap
-	schedulingMetadataHeap *SchedulingMetadataHeap // batches logs of scheduling metadata to heap
-	mostRecentBaseline     *SchedulingInput        // The most recently saved baseline scheduling input
+	schedulingInputHeap    *SchedulingInputHeap    // Batches logs of inputs to heap every reconcile loop.
+	schedulingMetadataHeap *SchedulingMetadataHeap // Batches logs of scheduling metadata to heap every reconcile loop.
+	mostRecentBaseline     *SchedulingInput        // The most recently saved full scheduling input on which subsequent diffs are based.
 	baselineSize           int                     // The size of the currently basedlined SchedulingInput in bytes
 	rebaselineThreshold    float32                 // The percentage threshold (between 0 and 1)
 	deltaToBaselineAvg     float32                 // The average delta to the baseline, moving average
 	shouldRebaseline       bool                    // Whether or not we should rebaseline (when the threshold is crossed)
-	savedDaemonSetPods     bool                    // One-time save of daemonset pods to Json at the first reconcile. Assumes they are relatively static
 }
 
 func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataHeap *SchedulingMetadataHeap) *Controller {
@@ -63,14 +64,11 @@ func NewController(schedulingInputHeap *SchedulingInputHeap, schedulingMetadataH
 		mostRecentBaseline:     nil,
 		shouldRebaseline:       true,
 		rebaselineThreshold:    initialDeltaThreshold,
-		savedDaemonSetPods:     false,
 	}
 }
 
 func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 	// ctx = injection.WithControllerName(ctx, "orb.batcher") // What is this for?
-
-	fmt.Println("----------  Starting an ORB Reconcile Cycle  ----------") // For debugging, delete later.
 
 	// Log the scheduling inputs from the heap into either baseline or differences
 	err := c.logSchedulingInputsToPV()
@@ -85,10 +83,6 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		fmt.Println("Error writing scheduling metadata to PV:", err)
 		return reconcile.Result{}, err
 	}
-
-	// Markers for testing, delete later
-	fmt.Println("----------- Ending an ORB Reconcile Cycle -----------")
-	fmt.Println()
 
 	return reconcile.Result{RequeueAfter: time.Second * 30}, nil
 }
