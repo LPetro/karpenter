@@ -42,7 +42,7 @@ const (
 	// Constants for rebaselining logic, calculating the moving average of differences' sizes compared to baseline size
 	initialDeltaThreshold = 0.50
 	decayFactor           = 0.9
-	updateFactor          = 0.1
+	updateFactor          = 1 - decayFactor
 	thresholdMultiplier   = 1.2
 	minThreshold          = 0.1
 )
@@ -109,7 +109,7 @@ func (c *Controller) logSchedulingInputsToPV() error {
 			}
 			c.mostRecentBaseline = &currentInput
 			c.shouldRebaseline = false
-		} else { // Batch the scheduling inputs that have changed since the last time we saved it to PV
+		} else { // Batch the scheduling inputs differences since the last time we saved it to PV
 			currentDifferences := c.mostRecentBaseline.Diff(&currentInput)
 			batchedDifferences = append(batchedDifferences, currentDifferences)
 			c.shouldRebaseline = c.determineRebaseline(currentDifferences.getByteSize())
@@ -200,9 +200,7 @@ func (c *Controller) writeToPV(logdata []byte, path string) error {
 
 // Determines if we should save a new baseline Scheduling Input, using a moving-average heuristic
 // The largest portion of the SchedulingInputs are InstanceTypes, so the expectation is that a
-// rebaseline will only be triggered when InstanceType offers change. This allows for changes if
-// other underlying data changes significantly, however.
-// TODO: due to its size, track/reconstruct diffs on InstanceTypes at a lower level.
+// rebaseline will only be triggered when InstanceType offerings change.
 func (c *Controller) determineRebaseline(diffSize int) bool {
 	diffSizeFloat := float32(diffSize)
 	baselineSizeFloat := float32(c.baselineSize)
@@ -210,7 +208,7 @@ func (c *Controller) determineRebaseline(diffSize int) bool {
 	// If differences' size exceeds threshold percentage, rebaseline and update moving average
 	if diffSizeFloat > c.rebaselineThreshold*baselineSizeFloat {
 		c.baselineSize = diffSize
-		c.deltaToBaselineAvg = float32(diffSize) / baselineSizeFloat
+		c.deltaToBaselineAvg = diffSizeFloat / baselineSizeFloat
 		return true
 	}
 

@@ -68,7 +68,6 @@ func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
 	return time.Time{} // Return the zero value of time.Time if no timestamp is found
 }
 
-// Gets the byte size of the cross-section of differences
 func (differences *SchedulingInputDifferences) getByteSize() int {
 	differencesData, err := MarshalBatchedDifferences([]*SchedulingInputDifferences{differences})
 	if err != nil {
