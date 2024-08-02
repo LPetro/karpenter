@@ -165,7 +165,7 @@ func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprov
 	allInstanceTypesNameMap := map[string]*cloudprovider.InstanceType{}
 	nodePoolToInstanceTypes := map[string][]string{}
 	for nodePool, instanceTypeSlice := range instanceTypes {
-		instanceTypeSliceNameMap := MapInstanceTypesByName(instanceTypeSlice)
+		instanceTypeSliceNameMap := CreateMapFromSlice(instanceTypeSlice, GetInstanceTypeKey)
 		for instanceTypeName, instanceType := range instanceTypeSliceNameMap {
 			allInstanceTypesNameMap[instanceTypeName] = instanceType
 		}

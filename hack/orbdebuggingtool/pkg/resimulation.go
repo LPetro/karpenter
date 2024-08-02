@@ -66,7 +66,7 @@ func getStateNodesFromSchedulingInput(schedulingInput *orb.SchedulingInput) []*s
 // Extract and reassociate nodepools to the instance types from the scheduling input.
 func getInstanceTypesFromSchedulingInput(schedulingInput *orb.SchedulingInput) map[string][]*cloudprovider.InstanceType {
 	instanceTypes := map[string][]*cloudprovider.InstanceType{}
-	allInstanceTypesMap := orb.MapInstanceTypesByName(schedulingInput.AllInstanceTypes)
+	allInstanceTypesMap := orb.CreateMapFromSlice(schedulingInput.AllInstanceTypes, orb.GetInstanceTypeKey)
 	for nodepoolName, instanceTypeNames := range schedulingInput.NodePoolInstanceTypes {
 		instanceTypes[nodepoolName] = []*cloudprovider.InstanceType{}
 		for _, instanceTypeName := range instanceTypeNames {
