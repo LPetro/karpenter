@@ -60,6 +60,7 @@ func getStateNodesFromSchedulingInput(schedulingInput *orb.SchedulingInput) []*s
 			NodeClaim: stateNodeWithPods.NodeClaim,
 		})
 	}
+	// change
 	return stateNodes
 }
 
