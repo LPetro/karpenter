@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -208,13 +209,19 @@ func getPodKey(pod *v1.Pod) string                             { return string(p
 func getStateNodeWithPodsKey(snwp *StateNodeWithPods) string   { return snwp.GetName() }
 func getInstanceTypeKey(it *cloudprovider.InstanceType) string { return it.Name }
 
+func createMapFromSlice[T any, K comparable](slice []*T, getKey func(*T) K) map[K]*T {
+	result := map[K]*T{}
+	for _, item := range slice {
+		key := getKey(item)
+		result[key] = item
+	}
+	return result
+}
+
 // Generalized function to merge in the Differences into each different Scheduling Input field.
 func merge[T any](items []*T, added []*T, removed []*T, changed []*T, getKey func(item *T) string) []*T {
 	// Create the initial map from items
-	mergedMap := map[string]*T{}
-	for _, item := range items {
-		mergedMap[getKey(item)] = item
-	}
+	mergedMap := createMapFromSlice(items, getKey)
 
 	for _, addedItem := range added {
 		mergedMap[getKey(addedItem)] = addedItem
@@ -231,6 +238,28 @@ func merge[T any](items []*T, added []*T, removed []*T, changed []*T, getKey fun
 		mergedItems = append(mergedItems, mergedItem)
 	}
 	return mergedItems
+}
+
+// Generalized function to merge Differences in place in a map.
+func mergeMap[K comparable, V any](m map[K]V, added, removed, changed map[K]V) {
+	for k, v := range added {
+		m[k] = v
+	}
+	for k := range removed {
+		delete(m, k)
+	}
+	for k, v := range changed {
+		m[k] = v
+	}
+}
+
+// Some fields of Scheduling Inputs won't have anything added or removed from them because they aren't slices or maps, and are only defined for changes.
+// This function handles those cases by merging the changed field into the iterating field if the changed field is non-empty.
+func mergeOnlyChanged[T any](original *T, difference *T) *T {
+	if difference != nil && !reflect.DeepEqual(*difference, reflect.Zero(reflect.TypeOf(*difference)).Interface()) {
+		return difference
+	}
+	return original
 }
 
 // Reconstructs a Scheduling Input at a desired reconstruct time by iteratively adding back all logged Differences onto the baseline Scheduling Input up until that time.
@@ -270,16 +299,22 @@ func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *Schedul
 	// iteratingInput.PendingPods = mergePods(iteratingInput.PendingPods, differences)
 	iteratingInput.StateNodesWithPods = merge(iteratingInput.StateNodesWithPods, differences.Added.StateNodesWithPods, differences.Removed.StateNodesWithPods, differences.Changed.StateNodesWithPods, getStateNodeWithPodsKey)
 	// iteratingInput.StateNodesWithPods = mergeStateNodesWithPods(iteratingInput.StateNodesWithPods, differences)
-	mergeBindings(iteratingInput.Bindings, differences) // Already a map, so can merge in place
+	mergeMap(iteratingInput.Bindings, differences.Added.Bindings, differences.Removed.Bindings, differences.Changed.Bindings)
+	// mergeBindings(iteratingInput.Bindings, differences)
 	iteratingInput.AllInstanceTypes = merge(iteratingInput.AllInstanceTypes, differences.Added.AllInstanceTypes, differences.Removed.AllInstanceTypes, differences.Changed.AllInstanceTypes, getInstanceTypeKey)
 	// iteratingInput.AllInstanceTypes = mergeInstanceTypes(iteratingInput.AllInstanceTypes, differences)
-	mergeNodePoolInstanceTypes(iteratingInput.NodePoolInstanceTypes, differences) // Already a map, so can merge in place
-	iteratingInput.Topology = mergeTopology(iteratingInput.Topology, differences)
+	mergeMap(iteratingInput.NodePoolInstanceTypes, differences.Added.NodePoolInstanceTypes, differences.Removed.NodePoolInstanceTypes, differences.Changed.NodePoolInstanceTypes)
+	// mergeNodePoolInstanceTypes(iteratingInput.NodePoolInstanceTypes, differences) // Already a map, so can merge in place
+	iteratingInput.Topology = mergeOnlyChanged(iteratingInput.Topology, differences.Changed.Topology)
+	// iteratingInput.Topology = mergeTopology(iteratingInput.Topology, differences)
 	iteratingInput.DaemonSetPods = merge(iteratingInput.DaemonSetPods, differences.Added.DaemonSetPods, differences.Removed.DaemonSetPods, differences.Changed.DaemonSetPods, getPodKey)
 	// iteratingInput.DaemonSetPods = mergeDaemonSetPods(iteratingInput.DaemonSetPods, differences)
-	iteratingInput.PVList = mergePVList(iteratingInput.PVList, differences)
-	iteratingInput.PVCList = mergePVCList(iteratingInput.PVCList, differences)
-	iteratingInput.ScheduledPodList = mergeScheduledPodList(iteratingInput.ScheduledPodList, differences)
+	iteratingInput.PVList = mergeOnlyChanged(iteratingInput.PVList, differences.Changed.PVList)
+	// iteratingInput.PVList = mergePVList(iteratingInput.PVList, differences)
+	iteratingInput.PVCList = mergeOnlyChanged(iteratingInput.PVCList, differences.Changed.PVCList)
+	// iteratingInput.PVCList = mergePVCList(iteratingInput.PVCList, differences)
+	iteratingInput.ScheduledPodList = mergeOnlyChanged(iteratingInput.ScheduledPodList, differences.Changed.ScheduledPodList)
+	// iteratingInput.ScheduledPodList = mergeScheduledPodList(iteratingInput.ScheduledPodList, differences)
 }
 
 // // Merge one time's set of differences over the baseline input or its merging iterant.
@@ -340,25 +375,25 @@ func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *Schedul
 // 	return mergedStateNodesWithPods
 // }
 
-// Merge the baseline/iterating bindings with the set of differences.
-func mergeBindings(iteratingBindings map[types.NamespacedName]string, differences *SchedulingInputDifferences) {
-	// Add, remove and change bindings from the iterating bindings
-	if differences.Added != nil && !differences.Added.isEmpty() {
-		for name, addingBinding := range differences.Added.Bindings {
-			iteratingBindings[name] = addingBinding
-		}
-	}
-	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for name := range differences.Removed.Bindings {
-			delete(iteratingBindings, name)
-		}
-	}
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for name, changingBinding := range differences.Changed.Bindings {
-			iteratingBindings[name] = changingBinding
-		}
-	}
-}
+// // Merge the baseline/iterating bindings with the set of differences.
+// func mergeBindings(iteratingBindings map[types.NamespacedName]string, differences *SchedulingInputDifferences) {
+// 	// Add, remove and change bindings from the iterating bindings
+// 	if differences.Added != nil && !differences.Added.isEmpty() {
+// 		for name, addingBinding := range differences.Added.Bindings {
+// 			iteratingBindings[name] = addingBinding
+// 		}
+// 	}
+// 	if differences.Removed != nil && !differences.Removed.isEmpty() {
+// 		for name := range differences.Removed.Bindings {
+// 			delete(iteratingBindings, name)
+// 		}
+// 	}
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		for name, changingBinding := range differences.Changed.Bindings {
+// 			iteratingBindings[name] = changingBinding
+// 		}
+// 	}
+// }
 
 // // Helper function to merge the baseline instanceTypes with the set of differences.
 // func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, differences *SchedulingInputDifferences) []*cloudprovider.InstanceType {
@@ -389,33 +424,33 @@ func mergeBindings(iteratingBindings map[types.NamespacedName]string, difference
 // 	return mergedInstanceTypes
 // }
 
-func mergeNodePoolInstanceTypes(iteratingNodePoolInstanceTypes map[string][]string, differences *SchedulingInputDifferences) {
-	// Add, remove and change nodePoolInstanceTypes from the iterating nodePoolInstanceTypes
-	if differences.Added != nil && !differences.Added.isEmpty() {
-		for nodePoolName, addingInstanceTypes := range differences.Added.NodePoolInstanceTypes {
-			iteratingNodePoolInstanceTypes[nodePoolName] = addingInstanceTypes
-		}
-	}
-	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for nodePoolName := range differences.Removed.NodePoolInstanceTypes {
-			delete(iteratingNodePoolInstanceTypes, nodePoolName)
-		}
-	}
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for nodePoolName, changingInstanceTypes := range differences.Changed.NodePoolInstanceTypes {
-			iteratingNodePoolInstanceTypes[nodePoolName] = changingInstanceTypes
-		}
-	}
-}
+// func mergeNodePoolInstanceTypes(iteratingNodePoolInstanceTypes map[string][]string, differences *SchedulingInputDifferences) {
+// 	// Add, remove and change nodePoolInstanceTypes from the iterating nodePoolInstanceTypes
+// 	if differences.Added != nil && !differences.Added.isEmpty() {
+// 		for nodePoolName, addingInstanceTypes := range differences.Added.NodePoolInstanceTypes {
+// 			iteratingNodePoolInstanceTypes[nodePoolName] = addingInstanceTypes
+// 		}
+// 	}
+// 	if differences.Removed != nil && !differences.Removed.isEmpty() {
+// 		for nodePoolName := range differences.Removed.NodePoolInstanceTypes {
+// 			delete(iteratingNodePoolInstanceTypes, nodePoolName)
+// 		}
+// 	}
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		for nodePoolName, changingInstanceTypes := range differences.Changed.NodePoolInstanceTypes {
+// 			iteratingNodePoolInstanceTypes[nodePoolName] = changingInstanceTypes
+// 		}
+// 	}
+// }
 
-func mergeTopology(iteratingTopology *scheduler.Topology, differences *SchedulingInputDifferences) *scheduler.Topology {
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		if differences.Changed.Topology != nil {
-			return differences.Changed.Topology
-		}
-	}
-	return iteratingTopology
-}
+// func mergeTopology(iteratingTopology *scheduler.Topology, differences *SchedulingInputDifferences) *scheduler.Topology {
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		if differences.Changed.Topology != nil {
+// 			return differences.Changed.Topology
+// 		}
+// 	}
+// 	return iteratingTopology
+// }
 
 // func mergeDaemonSetPods(iteratingDaemonSetPods []*v1.Pod, differences *SchedulingInputDifferences) []*v1.Pod {
 // 	iteratingDaemonSetPodMap := mapPodsByUID(iteratingDaemonSetPods)
@@ -444,32 +479,32 @@ func mergeTopology(iteratingTopology *scheduler.Topology, differences *Schedulin
 // 	return mergedDaemonSetPods
 // }
 
-func mergePVList(iteratingPVList *v1.PersistentVolumeList, differences *SchedulingInputDifferences) *v1.PersistentVolumeList {
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		if differences.Changed.PVList != nil {
-			return differences.Changed.PVList
-		}
-	}
-	return iteratingPVList
-}
+// func mergePVList(iteratingPVList *v1.PersistentVolumeList, differences *SchedulingInputDifferences) *v1.PersistentVolumeList {
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		if differences.Changed.PVList != nil {
+// 			return differences.Changed.PVList
+// 		}
+// 	}
+// 	return iteratingPVList
+// }
 
-func mergePVCList(iteratingPVCList *v1.PersistentVolumeClaimList, differences *SchedulingInputDifferences) *v1.PersistentVolumeClaimList {
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		if differences.Changed.PVCList != nil {
-			return differences.Changed.PVCList
-		}
-	}
-	return iteratingPVCList
-}
+// func mergePVCList(iteratingPVCList *v1.PersistentVolumeClaimList, differences *SchedulingInputDifferences) *v1.PersistentVolumeClaimList {
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		if differences.Changed.PVCList != nil {
+// 			return differences.Changed.PVCList
+// 		}
+// 	}
+// 	return iteratingPVCList
+// }
 
-func mergeScheduledPodList(iteratingScheduledPodList *v1.PodList, differences *SchedulingInputDifferences) *v1.PodList {
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		if differences.Changed.ScheduledPodList != nil {
-			return differences.Changed.ScheduledPodList
-		}
-	}
-	return iteratingScheduledPodList
-}
+// func mergeScheduledPodList(iteratingScheduledPodList *v1.PodList, differences *SchedulingInputDifferences) *v1.PodList {
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		if differences.Changed.ScheduledPodList != nil {
+// 			return differences.Changed.ScheduledPodList
+// 		}
+// 	}
+// 	return iteratingScheduledPodList
+// }
 
 // Helper function to map the baseline pods by UID
 
