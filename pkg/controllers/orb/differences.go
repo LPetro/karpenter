@@ -35,7 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// Generic definition for Differences, where each resource's differences are three versions of that same resource
+// A resource's Differences can be generalized three versions of that same resource: what has been Added, Removed or Changed.
 type Differences[T any] struct {
 	Added   T
 	Removed T
@@ -54,71 +54,6 @@ type PVListDifferences Differences[*v1.PersistentVolumeList]
 type PVCListDifferences Differences[*v1.PersistentVolumeClaimList]
 type ScheduledPodDifferences Differences[*v1.PodList]
 
-func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
-	protoAdded, protoRemoved, protoChanged := crossSection(batchedDifferences)
-	protoDifferences := &pb.BatchedDifferences{
-		Added:   protoSchedulingInputs(protoAdded),
-		Removed: protoSchedulingInputs(protoRemoved),
-		Changed: protoSchedulingInputs(protoChanged),
-	}
-	protoData, err := proto.Marshal(protoDifferences)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal Differences: %v", err)
-	}
-	return protoData, nil
-}
-
-func UnmarshalBatchedDifferences(differencesData []byte) ([]*SchedulingInputDifferences, error) {
-	batchedDifferences := &pb.BatchedDifferences{}
-	if err := proto.Unmarshal(differencesData, batchedDifferences); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal Differences: %v", err)
-	}
-
-	batchedAdded, err := reconstructSchedulingInputs(batchedDifferences.GetAdded())
-	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct Added: %v", err)
-	}
-	batchedRemoved, err := reconstructSchedulingInputs(batchedDifferences.GetRemoved())
-	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct Removed: %v", err)
-	}
-	batchedChanged, err := reconstructSchedulingInputs(batchedDifferences.GetChanged())
-	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct Changed: %v", err)
-	}
-
-	batchedSchedulingInputDifferences := []*SchedulingInputDifferences{}
-	for i := 0; i < len(batchedAdded); i++ { // They should have the same dimensionality, even if some are empty
-		batchedSchedulingInputDifferences = append(batchedSchedulingInputDifferences, &SchedulingInputDifferences{
-			Added:   batchedAdded[i],
-			Removed: batchedRemoved[i],
-			Changed: batchedChanged[i],
-		})
-	}
-
-	return batchedSchedulingInputDifferences, nil
-}
-
-func protoSchedulingInputs(si []*SchedulingInput) []*pb.SchedulingInput {
-	protoSi := []*pb.SchedulingInput{}
-	for _, schedulingInput := range si {
-		protoSi = append(protoSi, protoSchedulingInput(schedulingInput))
-	}
-	return protoSi
-}
-
-func reconstructSchedulingInputs(pbsi []*pb.SchedulingInput) ([]*SchedulingInput, error) {
-	reconstructedSi := []*SchedulingInput{}
-	for _, schedulingInput := range pbsi {
-		si, err := reconstructSchedulingInput(schedulingInput)
-		if err != nil {
-			return nil, err
-		}
-		reconstructedSi = append(reconstructedSi, si)
-	}
-	return reconstructedSi, nil
-}
-
 // Retrieves the time from any non-empty scheduling input in differences. The times are equivalent between them.
 func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
 	if differences.Added != nil && !differences.Added.Timestamp.IsZero() {
@@ -129,6 +64,15 @@ func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
 		return differences.Changed.Timestamp
 	}
 	return time.Time{} // Return the zero value of time.Time if no timestamp is found
+}
+
+// Get the byte size of the cross-section of differences to compare in rebaselining logic
+func (differences *SchedulingInputDifferences) getByteSize() int {
+	differencesData, err := MarshalBatchedDifferences([]*SchedulingInputDifferences{differences})
+	if err != nil {
+		differencesData = []byte{} // size 0
+	}
+	return len(differencesData)
 }
 
 // Gets the time window (i.e. from start to end timestamp) from a slice of differences. It returns (start, end)
@@ -167,7 +111,7 @@ func crossSection(differences []*SchedulingInputDifferences) ([]*SchedulingInput
 	return allAdded, allRemoved, allChanged
 }
 
-// Pulls a cross-section maps of each Scheduling Input differences mapped by their timestamp,
+// Pulls out cross-sectional maps of each Scheduling Input Difference mapped by their timestamp,
 // returned alongside the corresponding sorted slice of times for that batch, from oldest to most recent.
 func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[time.Time]*SchedulingInput, map[time.Time]*SchedulingInput, map[time.Time]*SchedulingInput, []time.Time) {
 	allAdded := map[time.Time]*SchedulingInput{}
@@ -176,6 +120,7 @@ func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[tim
 	batchedTimes := []time.Time{}
 
 	for _, diff := range differences {
+		// Map the Timestamp to its corresponding Difference
 		if diff.Added != nil && !diff.Added.Timestamp.IsZero() {
 			allAdded[diff.Added.Timestamp] = diff.Added
 		}
@@ -185,6 +130,7 @@ func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[tim
 		if diff.Changed != nil && !diff.Changed.Timestamp.IsZero() {
 			allChanged[diff.Changed.Timestamp] = diff.Changed
 		}
+		// Batch all Differences' timestamps together
 		batchedTimes = append(batchedTimes, diff.GetTimestamp())
 	}
 
@@ -192,36 +138,106 @@ func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[tim
 	return allAdded, allRemoved, allChanged, batchedTimes
 }
 
-// Get the byte size of the cross-section of differences to compare for rebaselining
-func (differences *SchedulingInputDifferences) getByteSize() int {
-	protoAdded := protoSchedulingInput(differences.Added)
-	protoRemoved := protoSchedulingInput(differences.Removed)
-	protoChanged := protoSchedulingInput(differences.Changed)
-
-	protoAddedData, err := proto.Marshal(protoAdded)
-	if err != nil {
-		protoAddedData = []byte{} // size 0
+func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
+	protoAdded, protoRemoved, protoChanged := crossSection(batchedDifferences)
+	protoDifferences := &pb.BatchedDifferences{
+		Added:   protoSchedulingInputs(protoAdded),
+		Removed: protoSchedulingInputs(protoRemoved),
+		Changed: protoSchedulingInputs(protoChanged),
 	}
-	protoRemovedData, err := proto.Marshal(protoRemoved)
+	protoData, err := proto.Marshal(protoDifferences)
 	if err != nil {
-		protoRemovedData = []byte{} // size 0
+		return nil, fmt.Errorf("failed to marshal Differences: %v", err)
 	}
-	protoChangedData, err := proto.Marshal(protoChanged)
-	if err != nil {
-		protoChangedData = []byte{} // size 0
-	}
-
-	return len(protoAddedData) + len(protoRemovedData) + len(protoChangedData)
+	return protoData, nil
 }
 
-// Function to merge differences read (back from the PV) to the baseline. They'll be read back and saved as a []*SchedulingInputDifferences
-// This function will need to extract the cross sections, take in a baseline *SchedulingInput and add the consolidatedAdded, conslidatedDelete and consolidatedChanges
-// which are just three *SchedulingInput's themselves. You can assume and put in placeholder functions for consolidateDifferences which pulls out those three consolidations.
+func UnmarshalBatchedDifferences(differencesData []byte) ([]*SchedulingInputDifferences, error) {
+	batchedDifferences := &pb.BatchedDifferences{}
+	if err := proto.Unmarshal(differencesData, batchedDifferences); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Differences: %v", err)
+	}
+
+	batchedAdded, err := reconstructSchedulingInputs(batchedDifferences.GetAdded())
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct Added: %v", err)
+	}
+	batchedRemoved, err := reconstructSchedulingInputs(batchedDifferences.GetRemoved())
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct Removed: %v", err)
+	}
+	batchedChanged, err := reconstructSchedulingInputs(batchedDifferences.GetChanged())
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct Changed: %v", err)
+	}
+
+	batchedSchedulingInputDifferences := []*SchedulingInputDifferences{}
+	for i := 0; i < len(batchedAdded); i++ { // They will have the same dimensionality, even if some are empty
+		batchedSchedulingInputDifferences = append(batchedSchedulingInputDifferences, &SchedulingInputDifferences{
+			Added:   batchedAdded[i],
+			Removed: batchedRemoved[i],
+			Changed: batchedChanged[i],
+		})
+	}
+
+	return batchedSchedulingInputDifferences, nil
+}
+
+func protoSchedulingInputs(si []*SchedulingInput) []*pb.SchedulingInput {
+	protoSi := []*pb.SchedulingInput{}
+	for _, schedulingInput := range si {
+		protoSi = append(protoSi, protoSchedulingInput(schedulingInput))
+	}
+	return protoSi
+}
+
+func reconstructSchedulingInputs(pbsi []*pb.SchedulingInput) ([]*SchedulingInput, error) {
+	reconstructedSi := []*SchedulingInput{}
+	for _, schedulingInput := range pbsi {
+		si, err := reconstructSchedulingInput(schedulingInput)
+		if err != nil {
+			return nil, err
+		}
+		reconstructedSi = append(reconstructedSi, si)
+	}
+	return reconstructedSi, nil
+}
+
+// Aliases for the getKey() functions passed into merge
+func getPodKey(pod *v1.Pod) string                             { return string(pod.GetUID()) }
+func getStateNodeWithPodsKey(snwp *StateNodeWithPods) string   { return snwp.GetName() }
+func getInstanceTypeKey(it *cloudprovider.InstanceType) string { return it.Name }
+
+// Generalized function to merge in the Differences into each different Scheduling Input field.
+func merge[T any](items []*T, added []*T, removed []*T, changed []*T, getKey func(item *T) string) []*T {
+	// Create the initial map from items
+	mergedMap := map[string]*T{}
+	for _, item := range items {
+		mergedMap[getKey(item)] = item
+	}
+
+	for _, addedItem := range added {
+		mergedMap[getKey(addedItem)] = addedItem
+	}
+	for _, removedItem := range removed {
+		delete(mergedMap, getKey(removedItem))
+	}
+	for _, changedItem := range changed {
+		mergedMap[getKey(changedItem)] = changedItem
+	}
+
+	mergedItems := []*T{}
+	for _, mergedItem := range mergedMap {
+		mergedItems = append(mergedItems, mergedItem)
+	}
+	return mergedItems
+}
+
+// Reconstructs a Scheduling Input at a desired reconstruct time by iteratively adding back all logged Differences onto the baseline Scheduling Input up until that time.
 func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*SchedulingInputDifferences, reconstructTime time.Time) *SchedulingInput {
-	// Extract the cross sections mapped by their timestamps
 	batchedAdded, batchedRemoved, batchedChanged, sortedBatchedTimes := crossSectionByTimestamp(batchedDifferences)
 
-	mergedInputs := &SchedulingInput{
+	mergingInputs := &SchedulingInput{
 		Timestamp:             reconstructTime,
 		PendingPods:           baseline.PendingPods,
 		StateNodesWithPods:    baseline.StateNodesWithPods,
@@ -235,98 +251,94 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 		ScheduledPodList:      baseline.ScheduledPodList,
 	}
 
-	// Iterate over the baseline, making each time's set of changes
 	for _, differencesTime := range sortedBatchedTimes {
-		// Stop if we've gotten to differences occuring after the time for when we're reconstructing.
 		if differencesTime.After(reconstructTime) {
 			break
 		}
-
-		// Merge the cross sections with the baseline
-		mergeSchedulingInputs(mergedInputs, &SchedulingInputDifferences{
+		mergeSchedulingInputs(mergingInputs, &SchedulingInputDifferences{
 			Added:   batchedAdded[differencesTime],
 			Removed: batchedRemoved[differencesTime],
 			Changed: batchedChanged[differencesTime],
 		})
 	}
-	return mergedInputs
+	return mergingInputs
 }
 
-// Merge SchedulingInputs function takes in those consolidations and the baseline and returns the merged schedulingInput reconstructed
-// Merging is adding, removing and changing each field as appropriate. Since a given time cross-section's changes are mutually exclusive
-// with each other (you won't have a removal for the same pod you just added), we can apply these as is.
+// Merges one time's set of Differences on the baseline/merging Inputs; adding, removing and changing each field as appropriate.
 func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *SchedulingInputDifferences) {
-	iteratingInput.PendingPods = mergePods(iteratingInput.PendingPods, differences)
-	iteratingInput.StateNodesWithPods = mergeStateNodesWithPods(iteratingInput.StateNodesWithPods, differences)
+	iteratingInput.PendingPods = merge(iteratingInput.PendingPods, differences.Added.PendingPods, differences.Removed.PendingPods, differences.Changed.PendingPods, getPodKey)
+	// iteratingInput.PendingPods = mergePods(iteratingInput.PendingPods, differences)
+	iteratingInput.StateNodesWithPods = merge(iteratingInput.StateNodesWithPods, differences.Added.StateNodesWithPods, differences.Removed.StateNodesWithPods, differences.Changed.StateNodesWithPods, getStateNodeWithPodsKey)
+	// iteratingInput.StateNodesWithPods = mergeStateNodesWithPods(iteratingInput.StateNodesWithPods, differences)
 	mergeBindings(iteratingInput.Bindings, differences) // Already a map, so can merge in place
-	iteratingInput.AllInstanceTypes = mergeInstanceTypes(iteratingInput.AllInstanceTypes, differences)
+	iteratingInput.AllInstanceTypes = merge(iteratingInput.AllInstanceTypes, differences.Added.AllInstanceTypes, differences.Removed.AllInstanceTypes, differences.Changed.AllInstanceTypes, getInstanceTypeKey)
+	// iteratingInput.AllInstanceTypes = mergeInstanceTypes(iteratingInput.AllInstanceTypes, differences)
 	mergeNodePoolInstanceTypes(iteratingInput.NodePoolInstanceTypes, differences) // Already a map, so can merge in place
 	iteratingInput.Topology = mergeTopology(iteratingInput.Topology, differences)
-	iteratingInput.DaemonSetPods = mergeDaemonSetPods(iteratingInput.DaemonSetPods, differences)
+	iteratingInput.DaemonSetPods = merge(iteratingInput.DaemonSetPods, differences.Added.DaemonSetPods, differences.Removed.DaemonSetPods, differences.Changed.DaemonSetPods, getPodKey)
+	// iteratingInput.DaemonSetPods = mergeDaemonSetPods(iteratingInput.DaemonSetPods, differences)
 	iteratingInput.PVList = mergePVList(iteratingInput.PVList, differences)
 	iteratingInput.PVCList = mergePVCList(iteratingInput.PVCList, differences)
 	iteratingInput.ScheduledPodList = mergeScheduledPodList(iteratingInput.ScheduledPodList, differences)
 }
 
-// TODO: Generalize the functions below to some interface mapping or "lo"-based helper.
+// // Merge one time's set of differences over the baseline input or its merging iterant.
+// func mergePods(iteratingPods []*v1.Pod, differences *SchedulingInputDifferences) []*v1.Pod {
+// 	iteratingPodMap := mapPodsByUID(iteratingPods)
 
-// Merge one time's set of differences over the baseline input or its merging iterant.
-func mergePods(iteratingPods []*v1.Pod, differences *SchedulingInputDifferences) []*v1.Pod {
-	iteratingPodMap := mapPodsByUID(iteratingPods)
+// 	// Add, remove and change pods from the iterating pods
+// 	if differences.Added != nil && !differences.Added.isEmpty() {
+// 		for _, addingPod := range differences.Added.PendingPods {
+// 			iteratingPodMap[addingPod.GetUID()] = addingPod
+// 		}
+// 	}
+// 	if differences.Removed != nil && !differences.Removed.isEmpty() {
+// 		for _, removingPod := range differences.Removed.PendingPods {
+// 			delete(iteratingPodMap, removingPod.GetUID())
+// 		}
+// 	}
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		for _, changingPod := range differences.Changed.PendingPods {
+// 			iteratingPodMap[changingPod.GetUID()] = changingPod
+// 		}
+// 	}
 
-	// Add, remove and change pods from the iterating pods
-	if differences.Added != nil && !differences.Added.isEmpty() {
-		for _, addingPod := range differences.Added.PendingPods {
-			iteratingPodMap[addingPod.GetUID()] = addingPod
-		}
-	}
-	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for _, removingPod := range differences.Removed.PendingPods {
-			delete(iteratingPodMap, removingPod.GetUID())
-		}
-	}
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for _, changingPod := range differences.Changed.PendingPods {
-			iteratingPodMap[changingPod.GetUID()] = changingPod
-		}
-	}
+// 	// Rebuild the iteratingPods slice from the podMap
+// 	mergedPods := []*v1.Pod{}
+// 	for _, pod := range iteratingPodMap {
+// 		mergedPods = append(mergedPods, pod)
+// 	}
+// 	return mergedPods
+// }
 
-	// Rebuild the iteratingPods slice from the podMap
-	mergedPods := []*v1.Pod{}
-	for _, pod := range iteratingPodMap {
-		mergedPods = append(mergedPods, pod)
-	}
-	return mergedPods
-}
+// // Helper function to merge the baseline stateNodesWithPods with the set of differences.
+// func mergeStateNodesWithPods(iteratingStateNodesWithPods []*StateNodeWithPods, differences *SchedulingInputDifferences) []*StateNodeWithPods {
+// 	iteratingStateNodesWithPodsMap := mapStateNodesWithPodsByName(iteratingStateNodesWithPods)
 
-// Helper function to merge the baseline stateNodesWithPods with the set of differences.
-func mergeStateNodesWithPods(iteratingStateNodesWithPods []*StateNodeWithPods, differences *SchedulingInputDifferences) []*StateNodeWithPods {
-	iteratingStateNodesWithPodsMap := mapStateNodesWithPodsByName(iteratingStateNodesWithPods)
+// 	// Add, remove and change stateNodesWithPods from the iterating stateNodesWithPods
+// 	if differences.Added != nil && !differences.Added.isEmpty() {
+// 		for _, addingStateNodeWithPods := range differences.Added.StateNodesWithPods {
+// 			iteratingStateNodesWithPodsMap[addingStateNodeWithPods.GetName()] = addingStateNodeWithPods
+// 		}
+// 	}
+// 	if differences.Removed != nil && !differences.Removed.isEmpty() {
+// 		for _, removingStateNodeWithPods := range differences.Removed.StateNodesWithPods {
+// 			delete(iteratingStateNodesWithPodsMap, removingStateNodeWithPods.GetName())
+// 		}
+// 	}
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		for _, changingStateNodeWithPods := range differences.Changed.StateNodesWithPods {
+// 			iteratingStateNodesWithPodsMap[changingStateNodeWithPods.GetName()] = changingStateNodeWithPods
+// 		}
+// 	}
 
-	// Add, remove and change stateNodesWithPods from the iterating stateNodesWithPods
-	if differences.Added != nil && !differences.Added.isEmpty() {
-		for _, addingStateNodeWithPods := range differences.Added.StateNodesWithPods {
-			iteratingStateNodesWithPodsMap[addingStateNodeWithPods.GetName()] = addingStateNodeWithPods
-		}
-	}
-	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for _, removingStateNodeWithPods := range differences.Removed.StateNodesWithPods {
-			delete(iteratingStateNodesWithPodsMap, removingStateNodeWithPods.GetName())
-		}
-	}
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for _, changingStateNodeWithPods := range differences.Changed.StateNodesWithPods {
-			iteratingStateNodesWithPodsMap[changingStateNodeWithPods.GetName()] = changingStateNodeWithPods
-		}
-	}
-
-	// Rebuild the iteratingStateNodesWithPods slice from the stateNodesWithPodsMap
-	mergedStateNodesWithPods := []*StateNodeWithPods{}
-	for _, stateNodeWithPods := range iteratingStateNodesWithPodsMap {
-		mergedStateNodesWithPods = append(mergedStateNodesWithPods, stateNodeWithPods)
-	}
-	return mergedStateNodesWithPods
-}
+// 	// Rebuild the iteratingStateNodesWithPods slice from the stateNodesWithPodsMap
+// 	mergedStateNodesWithPods := []*StateNodeWithPods{}
+// 	for _, stateNodeWithPods := range iteratingStateNodesWithPodsMap {
+// 		mergedStateNodesWithPods = append(mergedStateNodesWithPods, stateNodeWithPods)
+// 	}
+// 	return mergedStateNodesWithPods
+// }
 
 // Merge the baseline/iterating bindings with the set of differences.
 func mergeBindings(iteratingBindings map[types.NamespacedName]string, differences *SchedulingInputDifferences) {
@@ -348,34 +360,34 @@ func mergeBindings(iteratingBindings map[types.NamespacedName]string, difference
 	}
 }
 
-// Helper function to merge the baseline instanceTypes with the set of differences.
-func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, differences *SchedulingInputDifferences) []*cloudprovider.InstanceType {
-	iteratingInstanceTypesMap := MapInstanceTypesByName(iteratingInstanceTypes)
+// // Helper function to merge the baseline instanceTypes with the set of differences.
+// func mergeInstanceTypes(iteratingInstanceTypes []*cloudprovider.InstanceType, differences *SchedulingInputDifferences) []*cloudprovider.InstanceType {
+// 	iteratingInstanceTypesMap := MapInstanceTypesByName(iteratingInstanceTypes)
 
-	// Add, remove and change instanceTypes from the iterating instanceTypes
-	if differences.Added != nil && !differences.Added.isEmpty() {
-		for _, addingInstanceType := range differences.Added.AllInstanceTypes {
-			iteratingInstanceTypesMap[addingInstanceType.Name] = addingInstanceType
-		}
-	}
-	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for _, removingInstanceType := range differences.Removed.AllInstanceTypes {
-			delete(iteratingInstanceTypesMap, removingInstanceType.Name)
-		}
-	}
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for _, changingInstanceType := range differences.Changed.AllInstanceTypes {
-			iteratingInstanceTypesMap[changingInstanceType.Name] = changingInstanceType
-		}
-	}
+// 	// Add, remove and change instanceTypes from the iterating instanceTypes
+// 	if differences.Added != nil && !differences.Added.isEmpty() {
+// 		for _, addingInstanceType := range differences.Added.AllInstanceTypes {
+// 			iteratingInstanceTypesMap[addingInstanceType.Name] = addingInstanceType
+// 		}
+// 	}
+// 	if differences.Removed != nil && !differences.Removed.isEmpty() {
+// 		for _, removingInstanceType := range differences.Removed.AllInstanceTypes {
+// 			delete(iteratingInstanceTypesMap, removingInstanceType.Name)
+// 		}
+// 	}
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		for _, changingInstanceType := range differences.Changed.AllInstanceTypes {
+// 			iteratingInstanceTypesMap[changingInstanceType.Name] = changingInstanceType
+// 		}
+// 	}
 
-	// Rebuild the iteratingInstanceTypes slice from the instanceTypesMap
-	mergedInstanceTypes := []*cloudprovider.InstanceType{}
-	for _, instanceType := range iteratingInstanceTypesMap {
-		mergedInstanceTypes = append(mergedInstanceTypes, instanceType)
-	}
-	return mergedInstanceTypes
-}
+// 	// Rebuild the iteratingInstanceTypes slice from the instanceTypesMap
+// 	mergedInstanceTypes := []*cloudprovider.InstanceType{}
+// 	for _, instanceType := range iteratingInstanceTypesMap {
+// 		mergedInstanceTypes = append(mergedInstanceTypes, instanceType)
+// 	}
+// 	return mergedInstanceTypes
+// }
 
 func mergeNodePoolInstanceTypes(iteratingNodePoolInstanceTypes map[string][]string, differences *SchedulingInputDifferences) {
 	// Add, remove and change nodePoolInstanceTypes from the iterating nodePoolInstanceTypes
@@ -405,32 +417,32 @@ func mergeTopology(iteratingTopology *scheduler.Topology, differences *Schedulin
 	return iteratingTopology
 }
 
-func mergeDaemonSetPods(iteratingDaemonSetPods []*v1.Pod, differences *SchedulingInputDifferences) []*v1.Pod {
-	iteratingDaemonSetPodMap := mapPodsByUID(iteratingDaemonSetPods)
+// func mergeDaemonSetPods(iteratingDaemonSetPods []*v1.Pod, differences *SchedulingInputDifferences) []*v1.Pod {
+// 	iteratingDaemonSetPodMap := mapPodsByUID(iteratingDaemonSetPods)
 
-	// Add, remove and change pods from the iterating pods
-	if differences.Added != nil && !differences.Added.isEmpty() {
-		for _, addingPod := range differences.Added.DaemonSetPods {
-			iteratingDaemonSetPodMap[addingPod.GetUID()] = addingPod
-		}
-	}
-	if differences.Removed != nil && !differences.Removed.isEmpty() {
-		for _, removingPod := range differences.Removed.DaemonSetPods {
-			delete(iteratingDaemonSetPodMap, removingPod.GetUID())
-		}
-	}
-	if differences.Changed != nil && !differences.Changed.isEmpty() {
-		for _, changingPod := range differences.Changed.DaemonSetPods {
-			iteratingDaemonSetPodMap[changingPod.GetUID()] = changingPod
-		}
-	}
+// 	// Add, remove and change pods from the iterating pods
+// 	if differences.Added != nil && !differences.Added.isEmpty() {
+// 		for _, addingPod := range differences.Added.DaemonSetPods {
+// 			iteratingDaemonSetPodMap[addingPod.GetUID()] = addingPod
+// 		}
+// 	}
+// 	if differences.Removed != nil && !differences.Removed.isEmpty() {
+// 		for _, removingPod := range differences.Removed.DaemonSetPods {
+// 			delete(iteratingDaemonSetPodMap, removingPod.GetUID())
+// 		}
+// 	}
+// 	if differences.Changed != nil && !differences.Changed.isEmpty() {
+// 		for _, changingPod := range differences.Changed.DaemonSetPods {
+// 			iteratingDaemonSetPodMap[changingPod.GetUID()] = changingPod
+// 		}
+// 	}
 
-	mergedDaemonSetPods := []*v1.Pod{}
-	for _, pod := range iteratingDaemonSetPodMap {
-		mergedDaemonSetPods = append(mergedDaemonSetPods, pod)
-	}
-	return mergedDaemonSetPods
-}
+// 	mergedDaemonSetPods := []*v1.Pod{}
+// 	for _, pod := range iteratingDaemonSetPodMap {
+// 		mergedDaemonSetPods = append(mergedDaemonSetPods, pod)
+// 	}
+// 	return mergedDaemonSetPods
+// }
 
 func mergePVList(iteratingPVList *v1.PersistentVolumeList, differences *SchedulingInputDifferences) *v1.PersistentVolumeList {
 	if differences.Changed != nil && !differences.Changed.isEmpty() {
