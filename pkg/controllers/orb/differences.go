@@ -365,6 +365,7 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 
 // Merges one time's set of Differences on the baseline/merging Inputs; adding, removing and changing each field as appropriate.
 func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *SchedulingInputDifferences) {
+	// TODO Need to check these Added/Removed/Changed inputs for nilness or empty before calling their sub-fields...
 	iteratingInput.PendingPods = merge(iteratingInput.PendingPods, differences.Added.PendingPods, differences.Removed.PendingPods, differences.Changed.PendingPods, getPodKey)
 	iteratingInput.StateNodesWithPods = merge(iteratingInput.StateNodesWithPods, differences.Added.StateNodesWithPods, differences.Removed.StateNodesWithPods, differences.Changed.StateNodesWithPods, getStateNodeWithPodsKey)
 	mergeMap(iteratingInput.Bindings, differences.Added.Bindings, differences.Removed.Bindings, differences.Changed.Bindings)
