@@ -365,31 +365,36 @@ func MergeDifferences(baseline *SchedulingInput, batchedDifferences []*Schedulin
 
 // Merges one time's set of Differences on the baseline/merging Inputs; adding, removing and changing each field as appropriate.
 func mergeSchedulingInputs(iteratingInput *SchedulingInput, differences *SchedulingInputDifferences) {
-	// TODO Need to check these Added/Removed/Changed inputs for nilness or empty before calling their sub-fields...
-	iteratingInput.PendingPods = merge(iteratingInput.PendingPods, differences.Added.PendingPods, differences.Removed.PendingPods, differences.Changed.PendingPods, getPodKey)
-	iteratingInput.StateNodesWithPods = merge(iteratingInput.StateNodesWithPods, differences.Added.StateNodesWithPods, differences.Removed.StateNodesWithPods, differences.Changed.StateNodesWithPods, getStateNodeWithPodsKey)
-	mergeMap(iteratingInput.Bindings, differences.Added.Bindings, differences.Removed.Bindings, differences.Changed.Bindings)
-	iteratingInput.AllInstanceTypes = merge(iteratingInput.AllInstanceTypes, differences.Added.AllInstanceTypes, differences.Removed.AllInstanceTypes, differences.Changed.AllInstanceTypes, GetInstanceTypeKey)
-	mergeMap(iteratingInput.NodePoolInstanceTypes, differences.Added.NodePoolInstanceTypes, differences.Removed.NodePoolInstanceTypes, differences.Changed.NodePoolInstanceTypes)
-	iteratingInput.Topology = mergeOnlyChanged(iteratingInput.Topology, differences.Changed.Topology)
-	iteratingInput.DaemonSetPods = merge(iteratingInput.DaemonSetPods, differences.Added.DaemonSetPods, differences.Removed.DaemonSetPods, differences.Changed.DaemonSetPods, getPodKey)
-	iteratingInput.PVList = mergeOnlyChanged(iteratingInput.PVList, differences.Changed.PVList)
-	iteratingInput.PVCList = mergeOnlyChanged(iteratingInput.PVCList, differences.Changed.PVCList)
-	iteratingInput.ScheduledPodList = mergeOnlyChanged(iteratingInput.ScheduledPodList, differences.Changed.ScheduledPodList)
+	iteratingInput.PendingPods = merge(iteratingInput.PendingPods, differences, GetPendingPods, getPodKey)
+	iteratingInput.StateNodesWithPods = merge(iteratingInput.StateNodesWithPods, differences, GetStateNodesWithPods, getStateNodeWithPodsKey)
+	mergeMap(iteratingInput.Bindings, differences, GetBindings)
+	iteratingInput.AllInstanceTypes = merge(iteratingInput.AllInstanceTypes, differences, GetAllInstanceTypes, GetInstanceTypeKey)
+	mergeMap(iteratingInput.NodePoolInstanceTypes, differences, GetNodePoolInstanceTypes)
+	iteratingInput.Topology = mergeOnlyChanged(iteratingInput.Topology, differences, GetTopology)
+	iteratingInput.DaemonSetPods = merge(iteratingInput.DaemonSetPods, differences, GetDaemonSetPods, getPodKey)
+	iteratingInput.PVList = mergeOnlyChanged(iteratingInput.PVList, differences, GetPVList)
+	iteratingInput.PVCList = mergeOnlyChanged(iteratingInput.PVCList, differences, GetPVCList)
+	iteratingInput.ScheduledPodList = mergeOnlyChanged(iteratingInput.ScheduledPodList, differences, GetScheduledPodList)
 }
 
 // Generalized function to merge in the Differences into each different Scheduling Input field.
-func merge[T any](items []*T, added []*T, removed []*T, changed []*T, getKey func(item *T) string) []*T {
+func merge[T any](items []*T, differences *SchedulingInputDifferences, getResource func(*SchedulingInput) []*T, getKey func(item *T) string) []*T {
 	mergedMap := CreateMapFromSlice(items, getKey)
 
-	for _, addedItem := range added {
-		mergedMap[getKey(addedItem)] = addedItem
+	if differences.Added != nil {
+		for _, addedItem := range getResource(differences.Added) {
+			mergedMap[getKey(addedItem)] = addedItem
+		}
 	}
-	for _, removedItem := range removed {
-		delete(mergedMap, getKey(removedItem))
+	if differences.Removed != nil {
+		for _, removedItem := range getResource(differences.Removed) {
+			delete(mergedMap, getKey(removedItem))
+		}
 	}
-	for _, changedItem := range changed {
-		mergedMap[getKey(changedItem)] = changedItem
+	if differences.Changed != nil {
+		for _, changedItem := range getResource(differences.Changed) {
+			mergedMap[getKey(changedItem)] = changedItem
+		}
 	}
 
 	mergedItems := []*T{}
@@ -400,23 +405,32 @@ func merge[T any](items []*T, added []*T, removed []*T, changed []*T, getKey fun
 }
 
 // Generalized function to merge Differences in place in a map.
-func mergeMap[K comparable, V any](m map[K]V, added, removed, changed map[K]V) {
-	for k, v := range added {
-		m[k] = v
+func mergeMap[K comparable, V any](m map[K]V, differences *SchedulingInputDifferences, getResource func(*SchedulingInput) map[K]V) {
+	if differences.Added != nil {
+		for k, v := range getResource(differences.Added) {
+			m[k] = v
+		}
 	}
-	for k := range removed {
-		delete(m, k)
+	if differences.Removed != nil {
+		for k := range getResource(differences.Removed) {
+			delete(m, k)
+		}
 	}
-	for k, v := range changed {
-		m[k] = v
+	if differences.Changed != nil {
+		for k, v := range getResource(differences.Changed) {
+			m[k] = v
+		}
 	}
 }
 
 // Some fields of Scheduling Inputs won't have anything added or removed from them because they aren't slices or maps, and are only defined for changes.
 // This function handles those cases by merging the changed field into the iterating field if the changed field is non-empty.
-func mergeOnlyChanged[T any](original *T, difference *T) *T {
-	if difference != nil && !reflect.DeepEqual(*difference, reflect.Zero(reflect.TypeOf(*difference)).Interface()) {
-		return difference
+func mergeOnlyChanged[T any](original *T, differences *SchedulingInputDifferences, getResource func(*SchedulingInput) *T) *T {
+	if differences.Changed != nil {
+		difference := getResource(differences.Changed)
+		if difference != nil && !reflect.DeepEqual(*difference, reflect.Zero(reflect.TypeOf(*difference)).Interface()) { // Checks emptiness
+			return difference
+		}
 	}
 	return original
 }

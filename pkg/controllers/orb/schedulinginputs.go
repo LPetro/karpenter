@@ -56,13 +56,6 @@ type SchedulingInput struct {
 	ScheduledPodList      *v1.PodList
 }
 
-// A stateNode combined with its associated Pods.
-type StateNodeWithPods struct {
-	Node      *v1.Node
-	NodeClaim *v1beta1.NodeClaim
-	Pods      []*v1.Pod
-}
-
 // Construct a Scheduling Input and reduce it down to what's minimally required for resimulation
 func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pendingPods []*v1.Pod, stateNodes []*state.StateNode,
 	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) SchedulingInput {
@@ -105,13 +98,6 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 	}
 }
 
-func (snp StateNodeWithPods) GetName() string {
-	if snp.Node == nil {
-		return snp.NodeClaim.GetName()
-	}
-	return snp.Node.GetName()
-}
-
 // Comparator for MinTimeHeap interface
 func (si SchedulingInput) GetTime() time.Time {
 	return si.Timestamp
@@ -140,6 +126,52 @@ func (si *SchedulingInput) isEmpty() bool {
 		si.PVList == nil &&
 		si.PVCList == nil &&
 		si.ScheduledPodList == nil
+}
+
+// Resource getter methods to generalize a lambda function argument for merge
+func GetPendingPods(s *SchedulingInput) []*v1.Pod {
+	return s.PendingPods
+}
+func GetStateNodesWithPods(s *SchedulingInput) []*StateNodeWithPods {
+	return s.StateNodesWithPods
+}
+func GetBindings(s *SchedulingInput) map[types.NamespacedName]string {
+	return s.Bindings
+}
+func GetAllInstanceTypes(s *SchedulingInput) []*cloudprovider.InstanceType {
+	return s.AllInstanceTypes
+}
+func GetNodePoolInstanceTypes(s *SchedulingInput) map[string][]string {
+	return s.NodePoolInstanceTypes
+}
+func GetTopology(s *SchedulingInput) *scheduler.Topology {
+	return s.Topology
+}
+func GetDaemonSetPods(s *SchedulingInput) []*v1.Pod {
+	return s.DaemonSetPods
+}
+func GetPVList(s *SchedulingInput) *v1.PersistentVolumeList {
+	return s.PVList
+}
+func GetPVCList(s *SchedulingInput) *v1.PersistentVolumeClaimList {
+	return s.PVCList
+}
+func GetScheduledPodList(s *SchedulingInput) *v1.PodList {
+	return s.ScheduledPodList
+}
+
+// A stateNode combined with its associated Pods.
+type StateNodeWithPods struct {
+	Node      *v1.Node
+	NodeClaim *v1beta1.NodeClaim
+	Pods      []*v1.Pod
+}
+
+func (snp StateNodeWithPods) GetName() string {
+	if snp.Node == nil {
+		return snp.NodeClaim.GetName()
+	}
+	return snp.Node.GetName()
 }
 
 // Constructs StateNodesWithPods by reducing the stateNodes to their Node and NodeClaim and getting the Pods associated with them.
@@ -213,7 +245,7 @@ func reducePodConditions(conditions []v1.PodCondition) []v1.PodCondition {
 	return reducedConditions
 }
 
-// Just the exportable Node and NodeClaim in StateNode
+// Reducing to just the exportable fields: Node and NodeClaim in StateNode
 func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	reducedStateNodes := []*state.StateNode{}
 	for _, node := range nodes {
