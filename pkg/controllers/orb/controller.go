@@ -82,7 +82,6 @@ func (c *Controller) Reconcile(ctx context.Context) (reconcile.Result, error) {
 		fmt.Println("Error writing scheduling metadata to PV:", err)
 		return reconcile.Result{}, err
 	}
-
 	return reconcile.Result{RequeueAfter: time.Second * 30}, nil
 }
 
@@ -135,7 +134,6 @@ func (c *Controller) logSchedulingBaselineToPV(item *SchedulingInput) error {
 	fileName := fmt.Sprintf("SchedulingInputBaseline_%s.log", timestampStr)
 	path := filepath.Join(pvMountPath, fileName)
 
-	fmt.Println("ORB Log: Writing baseline data to S3 bucket.")
 	return c.writeToPV(logdata, path)
 }
 
@@ -153,8 +151,6 @@ func (c *Controller) logBatchedSchedulingDifferencesToPV(batchedDifferences []*S
 		fmt.Println("Error converting Scheduling Input to Protobuf:", err)
 		return err
 	}
-
-	fmt.Println("ORB Log: Writing differences data to S3 bucket.")
 	return c.writeToPV(logdata, path)
 }
 
@@ -177,8 +173,6 @@ func (c *Controller) logSchedulingMetadataToPV() error {
 		fmt.Println("Error marshalling data:", err)
 		return err
 	}
-
-	fmt.Println("ORB Log: Writing metadata to S3 bucket.")
 	return c.writeToPV(mappingdata, path)
 }
 
