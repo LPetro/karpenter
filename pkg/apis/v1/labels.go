@@ -52,6 +52,14 @@ const (
 	KubeletCompatabilityAnnotationKey  = apis.CompatabilityGroup + "/v1beta1-kubelet-conversion"
 )
 
+// Karpenter specific scheduling actions
+const (
+	ProvisioningSchedulingAction            = "normal-provisioning"
+	SingleNodeConsolidationSchedulingAction = "single-node-consolidation"
+	MultiNodeConsolidationSchedulingAction  = "multi-node-consolidation"
+	DriftSchedulingAction                   = "drift"
+)
+
 // Karpenter specific finalizers
 const (
 	TerminationFinalizer = apis.Group + "/termination"

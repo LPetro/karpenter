@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	v1api "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
 	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
@@ -79,18 +80,14 @@ func (h *MinTimeHeap[SchedulingInput]) LogSchedulingInput(ctx context.Context, k
 }
 
 // Pushes scheduling action metadata being scheduled by the Provisioner to their heap for the ORB controller to reconcile.
-func (h *MinTimeHeap[SchedulingMetadata]) LogSchedulingAction(ctx context.Context, schedulingTime time.Time) {
-	metadata, ok := GetSchedulingMetadata(ctx)
-	if !ok { // If metadata is not set in the context (i.e. scheduling was not prompted by a Consolidation or Drift) it is a normal provisioning action
-		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", schedulingTime)
-		metadata, _ = GetSchedulingMetadata(ctx) // Update metadata
+// Re-setting scheduling time here resolves the potential time difference between the start of an action call (consolidation/drift)
+// and its subsequent provisioning scheduling. This allows us to associate metadata with its respective scheduling action.
+func (h *MinTimeHeap[SchedulingMetadata]) LogSchedulingAction(ctx context.Context, schedulingAction string, schedulingTime time.Time) {
+	if schedulingAction == "" { // If scheduling reason is not set already (i.e. scheduling was not prompted by a Consolidation or Drift) it is a normal provisioning action
+		schedulingAction = v1api.ProvisioningSchedulingAction
 	}
 
-	// Resolve the potential time difference between the start of an action call (consolidation/drift) and its subsequent provisioning scheduling.
-	// This allows us to associate metadata with its respective scheduling action.
-	metadata.Timestamp = schedulingTime
-
-	heap.Push(h, metadata)
+	heap.Push(h, NewSchedulingMetadata(schedulingAction, schedulingTime))
 }
 
 // Converts from scheduling metadata's Karpenter representation to protobuf. It is nearly-symmetric to its Reconstruct function.

@@ -55,9 +55,9 @@ func NewControllers(
 ) []controller.Controller {
 
 	cluster := state.NewCluster(clock, kubeClient)
-	siHeap := orb.NewMinHeap[orb.SchedulingInput]()
-	smHeap := orb.NewMinHeap[orb.SchedulingMetadata]()
-	p := provisioning.NewProvisioner(kubeClient, recorder, cloudProvider, cluster, siHeap, smHeap)
+	schedulingInputHeap := orb.NewMinHeap[orb.SchedulingInput]()
+	schedulingMetadataHeap := orb.NewMinHeap[orb.SchedulingMetadata]()
+	p := provisioning.NewProvisioner(kubeClient, recorder, cloudProvider, cluster, schedulingInputHeap, schedulingMetadataHeap)
 	evictionQueue := terminator.NewQueue(kubeClient, recorder)
 	disruptionQueue := orchestration.NewQueue(kubeClient, recorder, cluster, clock, p)
 
@@ -84,7 +84,7 @@ func NewControllers(
 		nodeclaimgarbagecollection.NewController(clock, kubeClient, cloudProvider),
 		nodeclaimtermination.NewController(kubeClient, cloudProvider),
 		nodeclaimdisruption.NewController(clock, kubeClient, cluster, cloudProvider),
-		orb.NewController(siHeap, smHeap),
+		orb.NewController(schedulingInputHeap, schedulingMetadataHeap),
 		leasegarbagecollection.NewController(kubeClient),
 	}
 }

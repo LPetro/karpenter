@@ -37,7 +37,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	_ "knative.dev/pkg/system/testing"
-	"sigs.k8s.io/karpenter/hack/orbdebuggingtool/pkg"
+	"sigs.k8s.io/karpenter/tools/orbdebuggingtool/pkg"
 
 	"sigs.k8s.io/karpenter/pkg/apis/v1beta1"
 	"sigs.k8s.io/karpenter/pkg/controllers/orb"

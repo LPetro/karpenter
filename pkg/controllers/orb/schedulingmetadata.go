@@ -17,7 +17,6 @@ limitations under the License.
 package orb
 
 import (
-	"context"
 	"time"
 
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
@@ -38,24 +37,11 @@ func (sm SchedulingMetadata) GetTime() time.Time {
 	return sm.Timestamp
 }
 
-// Returns a new context with the provided scheduling metadata.
-func WithSchedulingMetadata(ctx context.Context, action string, timestamp time.Time) context.Context {
-	switch action {
-	case "normal-provisioning", "single-node-consolidation", "multi-node-consolidation", "drift":
-		metadata := SchedulingMetadata{
-			Action:    action,
-			Timestamp: timestamp,
-		}
-		return context.WithValue(ctx, schedulingMetadataKey, metadata)
-	default:
-		return ctx
+func NewSchedulingMetadata(action string, timestamp time.Time) SchedulingMetadata {
+	return SchedulingMetadata{
+		Action:    action,
+		Timestamp: timestamp,
 	}
-}
-
-// Retrieves the scheduling metadata from the context.
-func GetSchedulingMetadata(ctx context.Context) (SchedulingMetadata, bool) {
-	metadata, ok := ctx.Value(schedulingMetadataKey).(SchedulingMetadata)
-	return metadata, ok
 }
 
 func protoSchedulingMetadata(metadata SchedulingMetadata) *pb.SchedulingMetadataMap_MappingEntry {

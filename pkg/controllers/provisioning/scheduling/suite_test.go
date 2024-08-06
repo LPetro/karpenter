@@ -77,8 +77,8 @@ var cloudProvider *fake.CloudProvider
 var nodeStateController *informer.NodeController
 var nodeClaimStateController *informer.NodeClaimController
 var podStateController *informer.PodController
-var siHeap *orb.SchedulingInputHeap
-var smHeap *orb.SchedulingMetadataHeap
+var schedulingInputHeap *orb.SchedulingInputHeap
+var schedulingMetadataHeap *orb.SchedulingMetadataHeap
 
 const csiProvider = "fake.csi.provider"
 const isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
@@ -101,9 +101,9 @@ var _ = BeforeSuite(func() {
 	nodeStateController = informer.NewNodeController(env.Client, cluster)
 	nodeClaimStateController = informer.NewNodeClaimController(env.Client, cluster)
 	podStateController = informer.NewPodController(env.Client, cluster)
-	siHeap = orb.NewMinHeap[orb.SchedulingInput]()
-	smHeap = orb.NewMinHeap[orb.SchedulingMetadata]()
-	prov = provisioning.NewProvisioner(env.Client, events.NewRecorder(&record.FakeRecorder{}), cloudProvider, cluster, siHeap, smHeap)
+	schedulingInputHeap = orb.NewMinHeap[orb.SchedulingInput]()
+	schedulingMetadataHeap = orb.NewMinHeap[orb.SchedulingMetadata]()
+	prov = provisioning.NewProvisioner(env.Client, events.NewRecorder(&record.FakeRecorder{}), cloudProvider, cluster, schedulingInputHeap, schedulingMetadataHeap)
 })
 
 var _ = AfterSuite(func() {
@@ -3670,7 +3670,7 @@ var _ = Context("Scheduling", func() {
 					},
 				},
 			}) // Create 1000 pods which should take long enough to schedule that we should be able to read the queueDepth metric with a value
-			s, err := prov.NewScheduler(ctx, pods, nil)
+			s, err := prov.NewScheduler(ctx, pods, nil, "")
 			Expect(err).To(BeNil())
 
 			var wg sync.WaitGroup
@@ -3705,7 +3705,7 @@ var _ = Context("Scheduling", func() {
 					},
 				},
 			}) // Create 1000 pods which should take long enough to schedule that we should be able to read the queueDepth metric with a value
-			s, err := prov.NewScheduler(ctx, pods, nil)
+			s, err := prov.NewScheduler(ctx, pods, nil, "")
 			Expect(err).To(BeNil())
 			s.Solve(injection.WithControllerName(ctx, "provisioner"), pods)
 

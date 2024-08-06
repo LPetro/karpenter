@@ -57,8 +57,8 @@ var nodeClaimStateController *informer.NodeClaimController
 var fakeClock *clock.FakeClock
 var recorder *test.EventRecorder
 var queue *orchestration.Queue
-var siHeap *orb.SchedulingInputHeap
-var smHeap *orb.SchedulingMetadataHeap
+var schedulingInputHeap *orb.SchedulingInputHeap
+var schedulingMetadataHeap *orb.SchedulingMetadataHeap
 var prov *provisioning.Provisioner
 
 var replacements []string
@@ -83,9 +83,9 @@ var _ = BeforeSuite(func() {
 	nodeStateController = informer.NewNodeController(env.Client, cluster)
 	nodeClaimStateController = informer.NewNodeClaimController(env.Client, cluster)
 	recorder = test.NewEventRecorder()
-	siHeap = orb.NewMinHeap[orb.SchedulingInput]()
-	smHeap = orb.NewMinHeap[orb.SchedulingMetadata]()
-	prov = provisioning.NewProvisioner(env.Client, recorder, cloudProvider, cluster, siHeap, smHeap)
+	schedulingInputHeap = orb.NewMinHeap[orb.SchedulingInput]()
+	schedulingMetadataHeap = orb.NewMinHeap[orb.SchedulingMetadata]()
+	prov = provisioning.NewProvisioner(env.Client, recorder, cloudProvider, cluster, schedulingInputHeap, schedulingMetadataHeap)
 	queue = orchestration.NewTestingQueue(env.Client, recorder, cluster, fakeClock, prov)
 })
 

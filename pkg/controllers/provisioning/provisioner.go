@@ -218,7 +218,7 @@ func (p *Provisioner) consolidationWarnings(ctx context.Context, pods []*v1.Pod)
 var ErrNodePoolsNotFound = errors.New("no nodepools found")
 
 //nolint:gocyclo
-func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNodes []*state.StateNode) (*scheduler.Scheduler, error) {
+func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNodes []*state.StateNode, schedulingAction string) (*scheduler.Scheduler, error) {
 	nodePoolList := &v1beta1.NodePoolList{}
 	err := p.kubeClient.List(ctx, nodePoolList)
 	if err != nil {
@@ -262,9 +262,6 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 			continue
 		}
 		instanceTypes[nodePool.Name] = append(instanceTypes[nodePool.Name], instanceTypeOptions...)
-
-		// Here's where I can update ITs in the detailed logging
-		// Log instancetypes here, or diff-ed?
 
 		// Construct Topology Domains
 		for _, instanceType := range instanceTypeOptions {
@@ -318,7 +315,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 
 	// Push scheduling action and scheduling inputs to heaps for ORB controller reconciliation
 	schedulingTime := time.Now() // Used to sync a reference time for action and metadata.
-	p.schedulingMetadataHeap.LogSchedulingAction(ctx, schedulingTime)
+	p.schedulingMetadataHeap.LogSchedulingAction(ctx, schedulingAction, schedulingTime)
 	p.schedulingInputHeap.LogSchedulingInput(ctx, p.kubeClient, schedulingTime, pods, stateNodes, p.cluster.GetBindings(), instanceTypes, topology, daemonSetPods)
 
 	return scheduler.NewScheduler(p.kubeClient, lo.ToSlicePtr(nodePoolList.Items), p.cluster, stateNodes, topology, instanceTypes, daemonSetPods, p.recorder), nil
@@ -357,7 +354,7 @@ func (p *Provisioner) Schedule(ctx context.Context) (scheduler.Results, error) {
 	if len(pods) == 0 {
 		return scheduler.Results{}, nil
 	}
-	s, err := p.NewScheduler(ctx, pods, nodes.Active())
+	s, err := p.NewScheduler(ctx, pods, nodes.Active(), "")
 	if err != nil {
 		if errors.Is(err, ErrNodePoolsNotFound) {
 			log.FromContext(ctx).Info("no nodepools found")
