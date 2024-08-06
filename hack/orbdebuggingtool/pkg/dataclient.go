@@ -31,7 +31,7 @@ import (
 
 type ObjectKey = types.NamespacedName
 
-// An client which implements the minimal client interface to allow ORB to resimulate scheduling
+// A client which implements the minimal client interface to allow scheduling resimulation
 type DataClient struct {
 	persistentvolumeclaimlist *v1.PersistentVolumeClaimList
 	persistentvolumelist      *v1.PersistentVolumeList

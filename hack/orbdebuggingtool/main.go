@@ -49,6 +49,12 @@ import (
 var (
 	logPath               string // Points to where the logs are stored (whether from the user's PV or some local save of the files)
 	nodepoolsYamlFilepath string
+	nodePools             []*v1beta1.NodePool
+	reconstruct           bool
+	resimulate            bool
+	all                   bool
+	reconstructionOutput  string
+	outputDir             string
 	// TODO: Mount PV for access locally, if desired. (Or could leave that to a given customer?)
 )
 
@@ -78,10 +84,28 @@ func (pe *PodErrors) String() string {
 // Parse the command line arguments
 func init() {
 	flag.StringVar(&logPath, "dir", "", "Path to the directory containing logs")
-	flag.StringVar(&nodepoolsYamlFilepath, "yaml", "", "Path to the YAML file containing NodePool definitions")
+	flag.StringVar(&nodepoolsYamlFilepath, "nodepools", "", "Path to the YAML file containing NodePool definitions")
+	flag.BoolVar(&reconstruct, "reconstruct", false, "Reconstruct scheduling input(s) and print reconstruction to file. This is much slower than just resimulation.")
+	flag.BoolVar(&resimulate, "resimulate", true, "Reconstruct and resimulate scheduling input(s).\nSetting reconstruct to false but resimulate to true will reconstruct for resimulation but not print out the reconstruction.")
+	flag.BoolVar(&all, "all", false, "Reconstruct and/or resimulate *all* scheduling inputs for samples provided")
+	flag.StringVar(&reconstructionOutput, "rec-output", "yaml", "Output format for reconstructed scheduling input (yaml, json, or both)")
+	flag.StringVar(&outputDir, "out", ".", "Output directory for reconstructed scheduling input files")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
-	// TODO: This is cloud provider specific and needs to be generalized. Without it, however, the Difference logic in Requirements/Offerings will fail.
+	// Validate the reconstructionOutput flag value
+	switch strings.ToLower(reconstructionOutput) {
+	case "yaml", "json", "both":
+		// Valid values, do nothing
+	default:
+		fmt.Println("Invalid value for -rec-output flag. Valid options: 'yaml', 'json', 'both'. Using default value 'yaml'.")
+	}
+
+	// TODO: This is cloud provider specific and needs to be generalized.
+	// Warning: Without it, however, the Difference logic in Requirements/Offerings will fail.
 	v1beta1.RestrictedLabelDomains = v1beta1.RestrictedLabelDomains.Insert(v1prov.RestrictedLabelDomains...)
 	v1beta1.WellKnownLabels = v1beta1.WellKnownLabels.Insert(
 		v1prov.LabelInstanceHypervisor,
@@ -108,41 +132,54 @@ func init() {
 	)
 }
 
-// This conducts ORB Reconstruction from the command-line.
+// This conducts ORB Reconstruction and Resimulation from the command-line.
 func main() {
+	if !reconstruct && !resimulate {
+		fmt.Println("Neither reconstruct nor resimulate action specified. Use -reconstruct or -resimulate to perform actions.")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	options, err := getMetadataOptionsFromLogs()
 	if err != nil {
 		fmt.Println("Error reading metadata logs:", err)
 		return
 	}
-
-	selectedOption := promptUserForOption(options)
-	fmt.Printf("\nSelected option: '%s'\n", selectedOption) // Delete later
-	reconstructedSchedulingInput, err := reconstructFromOption(selectedOption.Timestamp)
-	if err != nil {
-		fmt.Println("Error reconstructing scheduling input:", err)
-		return
-	}
-	writeReconstruction(reconstructedSchedulingInput, "json")
-	writeReconstruction(reconstructedSchedulingInput, "yaml")
-
-	/* (Above) Original Scope: Log trace information important to Provisioning and Disruption as a start for troubleshooting */
-	/* ----------------------- */
-	/* (Below) Stretch Goal:   Have the tool resimulate and compare to the original results */
-
-	nodePools, err := unmarshalNodePoolsFromUser(nodepoolsYamlFilepath)
-	if err != nil {
-		fmt.Println("Error unmarshalling node pools:", err)
+	if len(options) == 0 {
+		fmt.Printf("No scheduling metadata logs found.\nPlease ensure the sample_logs directory at %s has the desired logs.\n", logPath)
 		return
 	}
 
-	results, err := pkg.Resimulate(reconstructedSchedulingInput, nodePools)
-	if err != nil {
-		fmt.Println("Error resimulating:", err)
-		return
+	if resimulate {
+		nodePools, err = unmarshalNodePoolsFromUser(nodepoolsYamlFilepath)
+		if err != nil {
+			fmt.Println("Error unmarshalling node pools:", err)
+			return
+		}
 	}
 
-	printResults(results, selectedOption.Timestamp, nodePools)
+	if all {
+		if !promptUserForConfirmation(len(options)) {
+			return
+		}
+
+		for _, option := range options {
+			err = reconstructAndResimulate(option.Timestamp)
+			if err != nil {
+				fmt.Printf("Error reconstructing/resimulating scheduling input for %s: %v\n", option.Timestamp, err)
+				continue
+			}
+		}
+	} else {
+		selectedOption := promptUserForOption(options)
+		fmt.Printf("\nSelected option: '%s'\n", selectedOption)
+
+		err = reconstructAndResimulate(selectedOption.Timestamp)
+		if err != nil {
+			fmt.Printf("Error reconstructing/resimulating scheduling input for %s: %v\n", selectedOption.Timestamp, err)
+			return
+		}
+	}
 }
 
 // Read all metadata log files in the directory and extract available options of scheduling actions
@@ -189,6 +226,37 @@ func getMetadataOptionsFromLogs() ([]*SchedulingMetadataOption, error) {
 	return options, nil
 }
 
+func promptUserForConfirmation(numOptions int) bool {
+	reader := bufio.NewReader(os.Stdin)
+
+	var action string
+	if reconstruct && resimulate {
+		action = "reconstruct and resimulate"
+	} else if reconstruct {
+		action = "reconstruct"
+	} else if resimulate {
+		action = "resimulate"
+	}
+
+	var plurality string
+	if numOptions > 1 {
+		plurality = "s"
+	}
+
+	fmt.Printf("Are you sure you want to %s %d scheduling input%s? (Y/N): ", action, numOptions, plurality)
+	response, _ := reader.ReadString('\n')
+	response = strings.ToLower(strings.TrimSpace(response))
+
+	if response == "y" || response == "yes" {
+		return true
+	} else if response == "n" || response == "no" {
+		return false
+	} else {
+		fmt.Println("Invalid response. Please enter 'Yes (Y)' or 'No (N)'.")
+		return promptUserForConfirmation(numOptions)
+	}
+}
+
 func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadataOption {
 	fmt.Println("Available options:")
 	for _, option := range options {
@@ -209,7 +277,21 @@ func promptUserForOption(options []*SchedulingMetadataOption) *SchedulingMetadat
 	return options[choice]
 }
 
-func reconstructFromOption(reconstructTime time.Time) (*orb.SchedulingInput, error) {
+func reconstructAndResimulate(timestamp time.Time) error {
+	reconstructedSchedulingInput, err := Reconstruct(timestamp)
+	if err != nil {
+		fmt.Printf("Error reconstructing scheduling input for %s: %v\n", timestamp, err)
+		return err
+	}
+	err = Resimulate(reconstructedSchedulingInput, timestamp)
+	if err != nil {
+		fmt.Printf("Error resimulating for %s: %v\n", timestamp, err)
+		return err
+	}
+	return nil
+}
+
+func Reconstruct(reconstructTime time.Time) (*orb.SchedulingInput, error) {
 	baselineFilename, differencesFilenames := GetReconstructionFiles(reconstructTime)
 	fmt.Println("Finding baseline file: ", baselineFilename)
 	reconstructedBaseline, err := ReconstructSchedulingInput(baselineFilename)
@@ -224,7 +306,35 @@ func reconstructFromOption(reconstructTime time.Time) (*orb.SchedulingInput, err
 		return nil, err
 	}
 
-	return orb.MergeDifferences(reconstructedBaseline, reconstructedDifferences, reconstructTime), nil
+	reconstructedSchedulingInput := orb.MergeDifferences(reconstructedBaseline, reconstructedDifferences, reconstructTime)
+
+	// In either case of reconstruct or resimulate, we need the reconstructed inputs created and returned. The flag is for printing them out.
+	if reconstruct {
+		switch reconstructionOutput {
+		case "yaml":
+			writeReconstruction(reconstructedSchedulingInput, "yaml")
+		case "json":
+			writeReconstruction(reconstructedSchedulingInput, "json")
+		case "both":
+			writeReconstruction(reconstructedSchedulingInput, "yaml")
+			writeReconstruction(reconstructedSchedulingInput, "json")
+		} // No default, pre-validated in init()
+	}
+
+	return reconstructedSchedulingInput, nil
+}
+
+func Resimulate(reconstructedSchedulingInput *orb.SchedulingInput, timestamp time.Time) error {
+	if resimulate {
+		results, err := pkg.Resimulate(reconstructedSchedulingInput, nodePools)
+		if err != nil {
+			fmt.Println("Error resimulating:", err)
+			return err
+		}
+
+		printResults(results, timestamp, nodePools)
+	}
+	return nil
 }
 
 // Function to pull from a directory (either a PV or a local log folder)
