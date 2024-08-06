@@ -25,18 +25,30 @@ The associated ORB Debugging Tool is a command-line tool that operates separatel
 <!-- Note: Needed only if/until development PR approved and merged in -->
 1. Pull developmental ORB branches [upstream](https://github.com/LPetro/karpenter/tree/orbpoc) and downstream:
    
-    - AWS: [Karpenter-provider-AWS with ORB](https://github.com/LPetro/karpenter-provider-aws/tree/orblog)
+    - AWS: [Karpenter-provider-AWS with ORB](https://github.com/LPetro/karpenter-provider-aws/tree/orblog)  
+        Note: While in development, if you are trying to test local branch edits to upstream, you will need to commit them in order to pull the changes into the Go workspace upstream. To do so:
+        - Navigate to your karpenter-provider-aws directory  
+        `cd /path/to/your/local/karpenter-provider-aws`
 
-2. [Setup Karpenter](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/)
+        - Replace the karpenter dependency with the latest commit  
+        `go mod edit -replace sigs.k8s.io/karpenter=github.com/path/to/your/upstream/changes/karpenter@"$commit_hash"`
+
+        - Tidy the go modules  
+        `go mod tidy`
+
+        - Apply the changes  
+        `make apply`  
+
+1. [Setup Karpenter](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/)
  
-3. Create a Persistent Volume (PV).  
+2. Create a Persistent Volume (PV).  
    
     - AWS: Create a [general-purpose S3 Bucket](https://docs.aws.amazon.com/AmazonS3/latest/userguide/creating-bucket.html).
     <!-- Kwok: (TODO: is there a template I could use here?) -->
-4. Mount the PV to your cluster.  
+3. Mount the PV to your cluster.  
    
     - AWS: Use the [Mountpoint for Amazon S3 CSI Driver](https://docs.aws.amazon.com/eks/latest/userguide/s3-csi.html), configured with your S3 bucket name from above.
-5. Create a static provisioning yaml file for your mounted PV/PVC.  
+4. Create a static provisioning yaml file for your mounted PV/PVC.  
     
     - AWS: [S3 CSI Driver Static Provisioning Example](https://github.com/awslabs/mountpoint-s3-csi-driver/blob/main/examples/kubernetes/static_provisioning/README.md)  
     
@@ -75,7 +87,7 @@ The associated ORB Debugging Tool is a command-line tool that operates separatel
             storage: 1200Gi # ignored, required
         volumeName: s3-pv
         ```  
-6. Deploy the PV/PVC static configuration:  
+5. Deploy the PV/PVC static configuration:  
    
    `kubectl apply -f path/to/pv_and_pvc_static_configuration.yaml`
 
