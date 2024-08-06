@@ -61,7 +61,7 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) SchedulingInput {
 	allInstanceTypes, nodePoolInstanceTypes := getAllInstanceTypesAndNodePoolMapping(instanceTypes)
 
-	// Get all PVs and PVCs from kubeClient
+	// Get all PVs, PVCs and scheduledPods from kubeClient
 	pvcList := &v1.PersistentVolumeClaimList{}
 	err := kubeClient.List(ctx, pvcList)
 	if err != nil {
@@ -74,8 +74,6 @@ func NewSchedulingInput(ctx context.Context, kubeClient client.Client, scheduled
 		fmt.Println("PV List error in Scheduling Input logging: ", err)
 		return SchedulingInput{}
 	}
-
-	// Get all scheduledPods from kubeClient
 	scheduledPodList := &v1.PodList{}
 	err = kubeClient.List(ctx, scheduledPodList)
 	if err != nil {
@@ -128,7 +126,8 @@ func (si *SchedulingInput) isEmpty() bool {
 		si.ScheduledPodList == nil
 }
 
-// Resource getter methods to generalize a lambda function argument for merge
+/* Resource getter methods to generalize a lambda function argument for merge */
+
 func GetPendingPods(s *SchedulingInput) []*v1.Pod {
 	return s.PendingPods
 }
@@ -211,6 +210,7 @@ func getAllInstanceTypesAndNodePoolMapping(instanceTypes map[string][]*cloudprov
 	return uniqueInstanceTypes, nodePoolToInstanceTypes
 }
 
+// Reduces pods to just their Name, Namespace, UID, PodSpec and the Status' Phase and reduced-Conditions
 func reducePods(pods []*v1.Pod) []*v1.Pod {
 	reducedPods := []*v1.Pod{}
 	for _, pod := range pods {
@@ -231,6 +231,7 @@ func reducePods(pods []*v1.Pod) []*v1.Pod {
 	return reducedPods
 }
 
+// Reduces a pod's conditions to only Type, Status, Reason and Message
 func reducePodConditions(conditions []v1.PodCondition) []v1.PodCondition {
 	reducedConditions := []v1.PodCondition{}
 	for _, condition := range conditions {
@@ -261,7 +262,7 @@ func reduceStateNodes(nodes []*state.StateNode) []*state.StateNode {
 	return reducedStateNodes
 }
 
-// Symmetric functions to convert between SchedulingInputs and their fields to protobuf serialization
+/* Symmetric functions to convert between SchedulingInputs and their fields to protobuf serialization */
 // Marshal <--> Unmarshal, outer layer functions from Karpenter structs to []byte and back
 // proto <--> reconstruct, inner layer functions from Karpenter structs to protobuf struct and back
 

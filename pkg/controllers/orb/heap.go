@@ -37,11 +37,14 @@ type TimestampedType interface {
 // MinTimeHeap is a generic min-heap implementation with the Timestamp field defined as the comparator
 type MinTimeHeap[T TimestampedType] []T
 
+type SchedulingInputHeap = MinTimeHeap[SchedulingInput]
+type SchedulingMetadataHeap = MinTimeHeap[SchedulingMetadata]
+
 func (h MinTimeHeap[T]) Len() int {
 	return len(h)
 }
 
-// This compares timestamps for a min heap, so that oldest elements pop first.
+// Compares timestamps for a min heap. Oldest elements pop first.
 func (h MinTimeHeap[T]) Less(i, j int) bool {
 	return h[i].GetTime().Before(h[j].GetTime())
 }
@@ -68,23 +71,21 @@ func NewMinHeap[T TimestampedType]() *MinTimeHeap[T] {
 	return h
 }
 
-type SchedulingInputHeap = MinTimeHeap[SchedulingInput]       // A min-heap of SchedulingInputs
-type SchedulingMetadataHeap = MinTimeHeap[SchedulingMetadata] // A min-heap of SchedulingMetadata
-
-// Logs inputs to the Provisioner Scheduler. Batched every ORB Reconcile loop via a min-heap (ordered by least-recent time scheduled).
+// Pushes Provisioner Scheduler inputs to their heap for the ORB controller to reconcile.
 func (h *MinTimeHeap[SchedulingInput]) LogSchedulingInput(ctx context.Context, kubeClient client.Client, scheduledTime time.Time, pods []*v1.Pod, stateNodes []*state.StateNode,
 	bindings map[types.NamespacedName]string, instanceTypes map[string][]*cloudprovider.InstanceType, topology *scheduler.Topology, daemonSetPods []*v1.Pod) {
 	si := NewSchedulingInput(ctx, kubeClient, scheduledTime, pods, stateNodes, bindings, instanceTypes, topology, daemonSetPods)
 	heap.Push(h, si)
 }
 
-// Logs metadata of the scheduling action taking place in the Provisioner Scheduler. Batched every ORB Reconcile loop via a min-heap (ordered by least-recent time scheduled).
+// Pushes scheduling action metadata being scheduled by the Provisioner to their heap for the ORB controller to reconcile.
 func (h *MinTimeHeap[SchedulingMetadata]) LogSchedulingAction(ctx context.Context, schedulingTime time.Time) {
 	metadata, ok := GetSchedulingMetadata(ctx)
-	if !ok { // If metadata is not set in the context--scheduling was not prompted by a Consolidation or Drift--it is a normal provisioning action
+	if !ok { // If metadata is not set in the context (i.e. scheduling was not prompted by a Consolidation or Drift) it is a normal provisioning action
 		ctx = WithSchedulingMetadata(ctx, "normal-provisioning", schedulingTime)
 		metadata, _ = GetSchedulingMetadata(ctx) // Update metadata
 	}
+
 	// Resolve the potential time difference between the start of an action call (consolidation/drift) and its subsequent provisioning scheduling.
 	// This allows us to associate metadata with its respective scheduling action.
 	metadata.Timestamp = schedulingTime
@@ -92,7 +93,7 @@ func (h *MinTimeHeap[SchedulingMetadata]) LogSchedulingAction(ctx context.Contex
 	heap.Push(h, metadata)
 }
 
-// Converts from scheduling metadata's Karpenter representation to protobuf. It is nearly-symmetric to its Reconstruct function
+// Converts from scheduling metadata's Karpenter representation to protobuf. It is nearly-symmetric to its Reconstruct function.
 func protoSchedulingMetadataMap(heap *SchedulingMetadataHeap) *pb.SchedulingMetadataMap {
 	mapping := &pb.SchedulingMetadataMap{}
 	for heap.Len() > 0 {
@@ -104,6 +105,7 @@ func protoSchedulingMetadataMap(heap *SchedulingMetadataHeap) *pb.SchedulingMeta
 }
 
 // Reconstructs scheduling metadata as a slice instead of back as a heap since each file will be heapified in aggregate.
+// It is nearly-symmetric to its proto function above; the slice of metadata is more meaningful than the original map as a reconstruction.
 func ReconstructAllSchedulingMetadata(mapping *pb.SchedulingMetadataMap) []*SchedulingMetadata {
 	metadata := []*SchedulingMetadata{}
 	for _, entry := range mapping.Entries {

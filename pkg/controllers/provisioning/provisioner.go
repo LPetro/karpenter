@@ -316,7 +316,7 @@ func (p *Provisioner) NewScheduler(ctx context.Context, pods []*v1.Pod, stateNod
 		return nil, fmt.Errorf("getting daemon pods, %w", err)
 	}
 
-	// Log scheduling action and scheduling inputs for ORB batcher
+	// Push scheduling action and scheduling inputs to heaps for ORB controller reconciliation
 	schedulingTime := time.Now() // Used to sync a reference time for action and metadata.
 	p.schedulingMetadataHeap.LogSchedulingAction(ctx, schedulingTime)
 	p.schedulingInputHeap.LogSchedulingInput(ctx, p.kubeClient, schedulingTime, pods, stateNodes, p.cluster.GetBindings(), instanceTypes, topology, daemonSetPods)

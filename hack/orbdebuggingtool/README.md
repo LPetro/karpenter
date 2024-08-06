@@ -102,7 +102,7 @@ This could just be a description of what needs to be added/changed in the deploy
 ## Running ORB
 The following section assumes you have met all the [prerequisites](#prereqs): Karpenter is up and running with the PV you have created and mounted to your cluster.
 <!-- TODO: Add feature-flag in. Include here the instructions for how to enable/disable feature. -->
-Once Karpenter is running, it will automatically log all provisioning scheduling data to your mounted PV as:  
+Once Karpenter is running, it will automatically log all provisioning scheduling data every reconcile cycle to your mounted PV as:  
 -  `SchedulingInputBaseline_`\<timestamp\>`.log`,  
 - `SchedulingInputDifferences_`\<starting-timestamp\>`_`\<ending-timestamp\>`.log`, and  
 - `SchedulingMetadata_`\<starting-timestamp\>`_`\<ending-timestamp\>`.log`
@@ -113,10 +113,10 @@ Once Karpenter is running, it will automatically log all provisioning scheduling
 
 <!-- TODO: make a note about /data default directory. If I make an arg for the tool, find a way to change this for a Karpenter run... perhaps with the same process that I'd use to feature-flag / enable/disable it... -->
 To run the ORB debugging tool:  
-1. Download logs from your PV and save them to the sample_logs folder `karpenter/hack/orbdebuggingtool/sample_logs`.  
+1. Download logs from your PV and save them to the sample_logs folder `karpenter/hack/orbdebuggingtool/sample_logs` or a folder of your choice.  
    This will be the target directory for the `-dir` flag.
   
-    Note: For whichever time period you're looking to inspect, ensure you have <u>at least</u>: (1) the baseline preceding that time period and all the (2) differences and (3) metadata files from that baseline through the desired resimulation time. This is critical to the reconstruction and resimulation logic, not having these could lead to undefined behavior.
+    Note: For whichever time period you're looking to inspect, ensure you have <u>at least</u>: (1) the baseline preceding that time period and (2) all the differences and (3) metadata files from that baseline through the desired resimulation time. This is critical to the reconstruction and resimulation logic; not having these could lead to undefined behavior.
 <!-- The reconstruction takes a baseline and merges in all differences additively. If any are missing, it could lead to undefined behavior. -->
 2. Find your nodepool configuration file. If part of a larger yaml config file, create a new nodepools.yaml of just the nodepool information. This will be the target directory for the `-yaml` flag.
 3. `cd ./path/to/karpenterfork/hack/orbdebuggingtool`
@@ -129,7 +129,7 @@ To run the ORB debugging tool:
 This will find all metadata info in the provided sample logs, combine and sort them to provide them as options to the user as shown below.
 
 ```bash
-loupetro@80a997330777 orbdebuggingtool % orbdebuggingtool % go run main.go -dir ./sample_logs -nodepools ./nodepools.yaml -reconstruct=true
+orbdebuggingtool % go run main.go -dir ./sample_logs -nodepools ./nodepools.yaml -reconstruct=true
 Available options:
 0. normal-provisioning (2024-08-05_18-18-45)
 1. normal-provisioning (2024-08-05_18-18-55)
@@ -154,7 +154,7 @@ Enter the option number:
 Enter the desired scheduling action you'd like to reconstruct or resimulate
 
 ```bash
-loupetro@80a997330777 orbdebuggingtool % go run main.go -dir ./sample_logs -nodepools ./nodepools.yaml -reconstruct=true
+orbdebuggingtool % go run main.go -dir ./sample_logs -nodepools ./nodepools.yaml -reconstruct=true
 Available options:
 0. normal-provisioning (2024-08-05_18-18-45)
 1. normal-provisioning (2024-08-05_18-18-55)

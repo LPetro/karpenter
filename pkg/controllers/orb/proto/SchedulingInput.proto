@@ -2,6 +2,9 @@ syntax = "proto3";
 
 option go_package = "sigs.k8s.io/karpenter/pkg/controllers/orb/proto";
 
+/* To compile any changes use:
+   protoc --go_out=. --go_opt=paths=source_relative SchedulingInput.proto */
+
 message BatchedDifferences {
   repeated SchedulingInput added = 1;
   repeated SchedulingInput removed = 2;

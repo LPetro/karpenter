@@ -28,33 +28,21 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
 	pb "sigs.k8s.io/karpenter/pkg/controllers/orb/proto"
-	scheduler "sigs.k8s.io/karpenter/pkg/controllers/provisioning/scheduling"
 
 	v1 "k8s.io/api/core/v1"
 )
 
-// A resource's Differences are generalized as three versions of that same resource: what has been Added, Removed or Changed.
+// A resource's Differences are three versions of that same resource: what has been Added, Removed or Changed.
 type Differences[T any] struct {
 	Added   T
 	Removed T
 	Changed T
 }
 
-// Aliases for Differences definitions
 type SchedulingInputDifferences Differences[*SchedulingInput]
-type PodDifferences Differences[[]*v1.Pod]
-type SNPDifferences Differences[[]*StateNodeWithPods]
-type BindingDifferences Differences[map[types.NamespacedName]string]
-type InstanceTypeDifferences Differences[[]*cloudprovider.InstanceType]
-type NodePoolsToInstanceTypesDifferences Differences[map[string][]string]
-type TopologyDifferences Differences[*scheduler.Topology]
-type PVListDifferences Differences[*v1.PersistentVolumeList]
-type PVCListDifferences Differences[*v1.PersistentVolumeClaimList]
-type ScheduledPodDifferences Differences[*v1.PodList]
 
 // Retrieves the time from any non-empty scheduling input in differences. The times are equivalent between them.
 func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
@@ -65,13 +53,13 @@ func (differences *SchedulingInputDifferences) GetTimestamp() time.Time {
 	} else if differences.Changed != nil && !differences.Changed.Timestamp.IsZero() {
 		return differences.Changed.Timestamp
 	}
-	return time.Time{} // Return the zero value of time.Time if no timestamp is found
+	return time.Time{} // Default the zero value of time.Time if no timestamp is found
 }
 
 func (differences *SchedulingInputDifferences) getByteSize() int {
 	differencesData, err := MarshalBatchedDifferences([]*SchedulingInputDifferences{differences})
 	if err != nil {
-		differencesData = []byte{} // size 0
+		return 0
 	}
 	return len(differencesData)
 }
@@ -140,11 +128,11 @@ func crossSectionByTimestamp(differences []*SchedulingInputDifferences) (map[tim
 }
 
 func MarshalBatchedDifferences(batchedDifferences []*SchedulingInputDifferences) ([]byte, error) {
-	protoAdded, protoRemoved, protoChanged := crossSection(batchedDifferences)
+	allAdded, allRemoved, allChanged := crossSection(batchedDifferences)
 	protoDifferences := &pb.BatchedDifferences{
-		Added:   protoSchedulingInputs(protoAdded),
-		Removed: protoSchedulingInputs(protoRemoved),
-		Changed: protoSchedulingInputs(protoChanged),
+		Added:   protoSchedulingInputs(allAdded),
+		Removed: protoSchedulingInputs(allRemoved),
+		Changed: protoSchedulingInputs(allChanged),
 	}
 	protoData, err := proto.Marshal(protoDifferences)
 	if err != nil {
@@ -217,19 +205,19 @@ func (oldSi *SchedulingInput) Diff(si *SchedulingInput) *SchedulingInputDifferen
 	pvcListDiff := diffOnlyChanges(oldSi.PVCList, si.PVCList)
 	scheduledPodListDiff := diffOnlyChanges(oldSi.ScheduledPodList, si.ScheduledPodList)
 
-	diffAdded := &SchedulingInput{}
-	diffRemoved := &SchedulingInput{}
-	diffChanged := &SchedulingInput{}
-
 	// Added and Removed is not defined for unitary resources (topology, pvList, pvcList and scheduledPodList).
-	if len(podDiff.Added) > 0 || len(snpDiff.Added) > 0 || len(bindingsDiff.Added) > 0 || len(itDiff.Added) > 0 || len(npitDiff.Added) > 0 || len(dspDiff.Added) > 0 {
-		diffAdded = &SchedulingInput{si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added, nil, dspDiff.Added, nil, nil, nil}
+	diffAdded := &SchedulingInput{si.Timestamp, podDiff.Added, snpDiff.Added, bindingsDiff.Added, itDiff.Added, npitDiff.Added, nil, dspDiff.Added, nil, nil, nil}
+	diffRemoved := &SchedulingInput{si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed, nil, dspDiff.Removed, nil, nil, nil}
+	diffChanged := &SchedulingInput{si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed, topologyDiff.Changed, dspDiff.Changed, pvListDiff.Changed, pvcListDiff.Changed, scheduledPodListDiff.Changed}
+
+	if diffAdded.isEmpty() {
+		diffAdded = &SchedulingInput{}
 	}
-	if len(podDiff.Removed) > 0 || len(snpDiff.Removed) > 0 || len(bindingsDiff.Removed) > 0 || len(itDiff.Removed) > 0 || len(npitDiff.Removed) > 0 || len(dspDiff.Removed) > 0 {
-		diffRemoved = &SchedulingInput{si.Timestamp, podDiff.Removed, snpDiff.Removed, bindingsDiff.Removed, itDiff.Removed, npitDiff.Removed, nil, dspDiff.Removed, nil, nil, nil}
+	if diffRemoved.isEmpty() {
+		diffRemoved = &SchedulingInput{}
 	}
-	if len(podDiff.Changed) > 0 || len(snpDiff.Changed) > 0 || len(bindingsDiff.Changed) > 0 || len(itDiff.Changed) > 0 || len(npitDiff.Changed) > 0 || (topologyDiff.Changed != nil) || len(dspDiff.Changed) > 0 || pvListDiff.Changed != nil || pvcListDiff.Changed != nil || scheduledPodListDiff.Changed != nil {
-		diffChanged = &SchedulingInput{si.Timestamp, podDiff.Changed, snpDiff.Changed, bindingsDiff.Changed, itDiff.Changed, npitDiff.Changed, topologyDiff.Changed, dspDiff.Changed, pvListDiff.Changed, pvcListDiff.Changed, scheduledPodListDiff.Changed}
+	if diffChanged.isEmpty() {
+		diffChanged = &SchedulingInput{}
 	}
 
 	return &SchedulingInputDifferences{
@@ -296,7 +284,8 @@ func diffOnlyChanges[T any](oldresource, newresource *T) Differences[*T] {
 	return Differences[*T]{nil, nil, oldresource}
 }
 
-// Equality functions for hasChanged lambda functions
+/* Equality functions for 'hasChanged' lambda functions */
+
 func hasPodChanged(oldPod, newPod *v1.Pod) bool {
 	return !equality.Semantic.DeepEqual(oldPod.ObjectMeta, newPod.ObjectMeta) ||
 		!equality.Semantic.DeepEqual(oldPod.Status, newPod.Status) ||
@@ -423,7 +412,7 @@ func mergeMap[K comparable, V any](m map[K]V, differences *SchedulingInputDiffer
 	}
 }
 
-// Some fields of Scheduling Inputs won't have anything added or removed from them because they aren't slices or maps, and are only defined for changes.
+// Some fields of Scheduling Inputs aren't slices or maps, and thus aren't defined for additions or removals, only for changes.
 // This function handles those cases by merging the changed field into the iterating field if the changed field is non-empty.
 func mergeOnlyChanged[T any](original *T, differences *SchedulingInputDifferences, getResource func(*SchedulingInput) *T) *T {
 	if differences.Changed != nil {
@@ -439,7 +428,7 @@ func CreateMapFromSlice[T any, K comparable](slice []*T, getKey func(*T) K) map[
 	return lo.Associate(slice, func(item *T) (K, *T) { return getKey(item), item })
 }
 
-// Aliases for the getKey() functions passed into merge
+// Aliases for the getKey() functions to pass into merge
 func getPodKey(pod *v1.Pod) string                             { return string(pod.GetUID()) }
 func getStateNodeWithPodsKey(snwp *StateNodeWithPods) string   { return snwp.GetName() }
 func GetInstanceTypeKey(it *cloudprovider.InstanceType) string { return it.Name }
